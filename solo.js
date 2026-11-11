@@ -2,782 +2,519 @@
 (() => {
   'use strict';
 
-  // ==========================================
-  // CONFIGURAÇÃO DO SUPABASE
-  // ==========================================
+  // =============================================
+  // CRÔNICAS DE ÉTER — MOTOR DE JORNADA
+  // MAIAR: MESTRE NARRADOR
+  // OTA: ADMINISTRADOR DE REGRAS
+  // =============================================
 
   const SUPABASE_URL = 'https://wwumjtorusjblitkzyjt.supabase.co';
-
-  const SUPABASE_KEY =
-    'sb_publishable_5DS37kwbBFfhOir50K0QyA_54lvldUM';
-
-  const SITE_URL =
-    'https://cronicasdoeter-rpg.github.io/Cronicas-de-eter/';
+  const SUPABASE_KEY = 'sb_publishable_5DS37kwbBFfhOir50K0QyA_54lvldUM';
 
   const $ = id => document.getElementById(id);
 
-  const ACTIVE_KEY = 'cronicas-eter-active-campaign';
-
   let db = null;
   let session = null;
-  let activeId = localStorage.getItem(ACTIVE_KEY) || '';
+  let campaignId = null;
+  let character = null;
   let busy = false;
+  let points = 12;
 
-  // ==========================================
-  // UTILITÁRIOS
-  // ==========================================
+  const ATTRIBUTES = [
+    ['for', 'Força'],
+    ['des', 'Destreza'],
+    ['con', 'Constituição'],
+    ['int', 'Inteligência'],
+    ['sab', 'Sabedoria'],
+    ['car', 'Carisma']
+  ];
 
-  function feedback(message) {
-    if ($('turnFeedback')) {
-      $('turnFeedback').textContent = message;
-    }
-  }
+  // =============================================
+  // VISUAL
+  // =============================================
 
-  function addEntry(kind, label, message) {
-    const log = $('storyLog');
-    if (!log) return;
+  function installStyle() {
+    if ($('eterEngineStyle')) return;
 
-    const empty = log.querySelector('.story-empty');
-    if (empty) empty.remove();
+    const style = document.createElement('style');
+    style.id = 'eterEngineStyle';
 
-    const entry = document.createElement('div');
-    entry.className = 'story-entry ' + kind;
+    style.textContent = `
+      #eterEngine {
+        color:#eee8dc;
+        font-family:Inter,system-ui,sans-serif;
+      }
 
-    const heading = document.createElement('small');
-    heading.textContent = label;
+      #eterEngine * { box-sizing:border-box; }
 
-    const content = document.createElement('div');
-    content.textContent = String(message || '');
+      .eter-card {
+        background:#151a25;
+        border:1px solid #394153;
+        border-radius:12px;
+        padding:17px;
+        margin-bottom:14px;
+      }
 
-    entry.append(heading, content);
-    log.appendChild(entry);
+      .eter-title {
+        font-family:Georgia,serif;
+        color:#e7c88d;
+        font-size:25px;
+        margin:5px 0 12px;
+      }
 
-    log.scrollTop = log.scrollHeight;
-  }
+      .eter-muted {
+        color:#a8afbd;
+        font-size:13px;
+        line-height:1.6;
+      }
 
-  function errorMessage(error) {
-    return error?.message || 'Ocorreu um erro inesperado.';
-  }
+      .eter-btn {
+        background:linear-gradient(135deg,#b58b4c,#80602e);
+        color:#160f08;
+        border:1px solid #e0bd7c;
+        border-radius:7px;
+        padding:12px 16px;
+        font-weight:800;
+        cursor:pointer;
+      }
 
-  function setStatus(message) {
-    if ($('soloStatus')) {
-      $('soloStatus').textContent = message;
-    }
-  }
+      .eter-btn.secondary {
+        background:#222a38;
+        border:1px solid #59647a;
+        color:#e9dfcc;
+      }
 
-  // ==========================================
-  // LOGIN E CADASTRO
-  // ==========================================
+      .eter-btn:disabled {
+        opacity:.45;
+        cursor:not-allowed;
+      }
 
-  function createAuthScreen() {
-    if ($('eterAuth')) return;
+      .eter-input {
+        width:100%;
+        background:#0d111a;
+        border:1px solid #465064;
+        color:#fff;
+        padding:12px;
+        border-radius:7px;
+        margin:6px 0 13px;
+      }
 
-    const panel = document.createElement('div');
+      .eter-label {
+        display:block;
+        font-size:12px;
+        color:#d8c39d;
+        margin-top:10px;
+      }
 
-    panel.id = 'eterAuth';
+      .eter-grid {
+        display:grid;
+        grid-template-columns:repeat(2,minmax(0,1fr));
+        gap:10px;
+      }
 
-    panel.style.cssText = `
-      position:fixed;
-      inset:0;
-      z-index:999999;
-      background:#080a12ee;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      padding:18px;
-      font-family:system-ui;
-      color:#eee;
+      .eter-attribute {
+        background:#202635;
+        border:1px solid #3c465a;
+        border-radius:8px;
+        padding:10px;
+      }
+
+      .eter-attribute button {
+        background:#30394b;
+        color:white;
+        border:0;
+        border-radius:5px;
+        padding:5px 12px;
+      }
+
+      .eter-attribute strong {
+        color:#e9c987;
+        font-size:20px;
+      }
+
+      .eter-story {
+        min-height:180px;
+        max-height:55vh;
+        overflow:auto;
+        background:#0e121b;
+        border:1px solid #343e51;
+        border-radius:9px;
+        padding:13px;
+      }
+
+      .eter-scene {
+        white-space:pre-wrap;
+        line-height:1.8;
+        font-size:14px;
+      }
+
+      .eter-entry {
+        border-bottom:1px solid #30394a;
+        padding:12px 0;
+      }
+
+      .eter-entry.player { color:#e4c68e; }
+
+      .eter-entry.mai ar { color:#d9d5f4; }
+
+      .eter-entry small {
+        display:block;
+        color:#9ca7ba;
+        font-weight:800;
+        margin-bottom:6px;
+      }
+
+      .eter-options {
+        display:grid;
+        gap:8px;
+        margin-top:12px;
+      }
+
+      .eter-option {
+        text-align:left;
+        background:#202839;
+        border:1px solid #6c624c;
+        color:#f0e5d0;
+        border-radius:8px;
+        padding:12px;
+      }
+
+      .eter-option:disabled { opacity:.4; }
+
+      .eter-composer {
+        display:flex;
+        flex-direction:column;
+        gap:9px;
+        margin-top:13px;
+      }
+
+      .eter-composer textarea {
+        min-height:90px;
+        resize:vertical;
+      }
+
+      .eter-agent {
+        display:flex;
+        justify-content:space-between;
+        gap:10px;
+        padding:10px;
+        background:#202635;
+        border-radius:8px;
+        margin-bottom:7px;
+      }
+
+      .eter-status {
+        color:#a9c99e;
+        font-size:12px;
+      }
+
+      .eter-screen { display:none; }
+      .eter-screen.active { display:block; }
+
+      @media(max-width:600px) {
+        .eter-grid { grid-template-columns:1fr; }
+        .eter-title { font-size:22px; }
+      }
     `;
 
-    panel.innerHTML = `
-      <div style="
-        width:min(430px,100%);
-        background:#171a26;
-        border:1px solid #92774d;
-        border-radius:15px;
-        padding:24px;
-        box-shadow:0 20px 70px #000;
-      ">
+    document.head.appendChild(style);
+  }
 
-        <h2 style="color:#e4c78b">
-          CRÔNICAS DE ÉTER
-        </h2>
+  // =============================================
+  // MENU E TELA
+  // =============================================
 
-        <p>
-          Entre na sua conta ou crie um novo aventureiro.
-        </p>
+  function installInterface() {
+    const nav = $('nav');
 
-        <label>E-mail</label>
+    if (nav && !nav.querySelector('[data-tab="solo"]')) {
+      const button = document.createElement('button');
+      button.dataset.tab = 'solo';
+      button.innerHTML = '<span class="ico">✧</span>Jornada · Maiar';
+      nav.appendChild(button);
+    }
 
-        <input
-          id="eterEmail"
-          type="email"
-          autocomplete="email"
-          placeholder="Seu e-mail"
-          style="
-            width:100%;
-            padding:12px;
-            margin:8px 0 15px;
-            background:#0d1019;
-            color:white;
-            border:1px solid #555;
-            border-radius:7px;
-          "
-        >
+    const section = $('solo');
 
-        <label>Senha</label>
+    if (!section) {
+      console.error('Seção solo não encontrada no HTML.');
+      return;
+    }
 
-        <input
-          id="eterPassword"
-          type="password"
-          autocomplete="current-password"
-          placeholder="Sua senha"
-          style="
-            width:100%;
-            padding:12px;
-            margin:8px 0 15px;
-            background:#0d1019;
-            color:white;
-            border:1px solid #555;
-            border-radius:7px;
-          "
-        >
+    section.innerHTML = `
+      <div id="eterEngine">
 
-        <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <div class="eter-card">
+          <div class="eter-muted">CRÔNICAS DE ÉTER · RPG DE MESA SOLO</div>
+          <h2 class="eter-title">A sua lenda começa aqui</h2>
 
-          <button id="eterLogin">
-            ENTRAR
-          </button>
+          <div class="eter-agent">
+            <b>📖 MAIAR — Mestre Narrador</b>
+            <span id="maiStatus">Aguardando</span>
+          </div>
 
-          <button id="eterRegister">
-            CRIAR CONTA
-          </button>
+          <div class="eter-agent">
+            <b>⚙ OTA — Administrador</b>
+            <span id="otaStatus">Aguardando</span>
+          </div>
+
+          <div id="eterMessage" class="eter-status">
+            Conectando ao mundo...
+          </div>
+        </div>
+
+        <div id="eterHome" class="eter-screen active">
+
+          <div class="eter-card">
+            <h3 class="eter-title">Sua jornada</h3>
+            <p class="eter-muted">
+              Continue uma campanha existente ou comece uma
+              aventura completamente nova.
+            </p>
+
+            <button class="eter-btn" id="eterContinue" style="width:100%">
+              CONTINUAR JORNADA
+            </button>
+
+            <button class="eter-btn secondary" id="eterNew" style="width:100%;margin-top:9px">
+              COMEÇAR DO ZERO
+            </button>
+          </div>
+
+          <div class="eter-card">
+            <label class="eter-label">Campanhas existentes</label>
+            <select id="eterCampaignList" class="eter-input">
+              <option value="">Carregando campanhas...</option>
+            </select>
+          </div>
 
         </div>
 
-        <p
-          id="eterAuthMessage"
-          style="font-size:13px;color:#e4c78b;margin-top:15px"
-        ></p>
+        <div id="eterCreation" class="eter-screen">
+
+          <div class="eter-card">
+            <h3 class="eter-title">Criação do aventureiro</h3>
+            <p class="eter-muted">
+              Crie seu personagem. Seus atributos determinarão
+              suas possibilidades durante a aventura.
+            </p>
+
+            <label class="eter-label">Nome do personagem</label>
+            <input id="eterName" class="eter-input" maxlength="60"
+              placeholder="Nome do seu herói">
+
+            <label class="eter-label">Nome da campanha</label>
+            <input id="eterCampaignName" class="eter-input"
+              value="Uma nova lenda">
+
+            <label class="eter-label">Raça</label>
+            <select id="eterRace" class="eter-input">
+              <option>Humano</option>
+              <option>Elfo</option>
+              <option>Anão</option>
+              <option>Orc</option>
+              <option>Draconato</option>
+              <option>Meio-elfo</option>
+              <option>Fada</option>
+              <option>Demônio</option>
+              <option>Celestial</option>
+              <option>Outra</option>
+            </select>
+
+            <label class="eter-label">Classe</label>
+            <select id="eterClass" class="eter-input">
+              <option>Guerreiro</option>
+              <option>Mago</option>
+              <option>Arcanista</option>
+              <option>Paladino</option>
+              <option>Clérigo</option>
+              <option>Ladino</option>
+              <option>Arqueiro</option>
+              <option>Druida</option>
+              <option>Necromante</option>
+              <option>Bárbaro</option>
+              <option>Monge</option>
+              <option>Bardo</option>
+            </select>
+
+            <label class="eter-label">Origem da aventura</label>
+            <textarea id="eterPremise" class="eter-input" rows="3"
+              placeholder="Ex.: Um mundo medieval onde a magia está desaparecendo..."></textarea>
+
+            <h3>Distribua seus atributos</h3>
+            <p class="eter-muted">
+              Cada atributo começa em 5. Você possui 12 pontos adicionais.
+            </p>
+
+            <div id="eterPoints" style="color:#e9c987;font-weight:bold;margin:12px 0">
+              Pontos disponíveis: 12
+            </div>
+
+            <div class="eter-grid" id="eterAttributes"></div>
+
+            <button class="eter-btn" id="eterStart" style="width:100%;margin-top:16px">
+              CRIAR PERSONAGEM E INICIAR
+            </button>
+
+            <button class="eter-btn secondary" id="eterBack" style="width:100%;margin-top:8px">
+              VOLTAR
+            </button>
+          </div>
+
+        </div>
+
+        <div id="eterJourney" class="eter-screen">
+
+          <div class="eter-card">
+            <div class="eter-muted">CAMPANHA ATIVA</div>
+            <h3 class="eter-title" id="eterJourneyTitle">A Jornada</h3>
+
+            <div id="eterCharacter" class="eter-muted"></div>
+
+            <button class="eter-btn secondary" id="eterHomeButton">
+              VOLTAR AO INÍCIO
+            </button>
+          </div>
+
+          <div class="eter-card">
+            <h3>📖 MAIAR — O MESTRE</h3>
+            <p class="eter-muted">
+              O mundo reage às suas decisões. Você pode escolher
+              uma opção ou escrever qualquer ação.
+            </p>
+
+            <div id="eterStory" class="eter-story">
+              Aguardando a primeira cena...
+            </div>
+
+            <div id="eterOptions" class="eter-options"></div>
+
+            <div class="eter-composer">
+              <textarea id="eterAction" class="eter-input"
+                placeholder="Descreva o que seu personagem deseja fazer..."
+              ></textarea>
+
+              <button id="eterSend" class="eter-btn">
+                REALIZAR AÇÃO
+              </button>
+            </div>
+
+            <div id="eterFeedback" class="eter-status" style="margin-top:12px"></div>
+          </div>
+
+        </div>
 
       </div>
     `;
 
-    document.body.appendChild(panel);
+    $('eterNew').onclick = () => showScreen('eterCreation');
+    $('eterBack').onclick = () => showScreen('eterHome');
+    $('eterHomeButton').onclick = () => showScreen('eterHome');
+    $('eterStart').onclick = startNewCampaign;
+    $('eterContinue').onclick = continueCampaign;
+    $('eterSend').onclick = sendFreeAction;
 
-    $('eterLogin').onclick = login;
-    $('eterRegister').onclick = register;
-  }
-
-  function authMessage(message) {
-    if ($('eterAuthMessage')) {
-      $('eterAuthMessage').textContent = message;
-    }
-  }
-
-  async function login() {
-    try {
-      const email = $('eterEmail').value.trim();
-      const password = $('eterPassword').value;
-
-      if (!email || !password) {
-        throw new Error('Preencha e-mail e senha.');
+    $('eterAction').addEventListener('keydown', e => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendFreeAction();
       }
-
-      authMessage('Entrando...');
-
-      const { error } =
-        await db.auth.signInWithPassword({
-          email,
-          password
-        });
-
-      if (error) throw error;
-
-      authMessage('Login realizado.');
-
-    } catch (error) {
-      authMessage(errorMessage(error));
-    }
-  }
-
-  async function register() {
-    try {
-      const email = $('eterEmail').value.trim();
-      const password = $('eterPassword').value;
-
-      if (!email || !password) {
-        throw new Error('Preencha e-mail e senha.');
-      }
-
-      if (password.length < 6) {
-        throw new Error('A senha precisa ter pelo menos 6 caracteres.');
-      }
-
-      authMessage('Criando conta...');
-
-      const { data, error } =
-        await db.auth.signUp({
-          email,
-          password,
-          options: {
-            emailRedirectTo: SITE_URL
-          }
-        });
-
-      if (error) throw error;
-
-      if (data.session) {
-        authMessage('Conta criada com sucesso!');
-      } else {
-        authMessage(
-          'Conta criada! Confirme seu e-mail antes de entrar.'
-        );
-      }
-
-    } catch (error) {
-      authMessage(errorMessage(error));
-    }
-  }
-
-  function showAuth(visible) {
-    const panel = $('eterAuth');
-
-    if (panel) {
-      panel.style.display = visible ? 'flex' : 'none';
-    }
-  }
-
-  // ==========================================
-  // PERSONAGEM
-  // ==========================================
-
-  function renderCharacter(character) {
-    const c = character || {};
-    const resources = c.resources || {};
-
-    if (!$('soloState')) return;
-
-    $('soloState').innerHTML = `
-      <b>${c.name || 'Aventureiro'}</b>
-
-      · Nível ${Number(c.level || 1)}
-
-      <br>
-
-      ❤️ HP: ${Number(resources.hp ?? 20)}
-
-      <br>
-
-      ✧ Mana: ${Number(resources.mana ?? 10)}
-
-      <br>
-
-      XP: ${Number(c.experience || 0)}
-    `;
-  }
-
-  async function createCharacter(campaignId) {
-    const { error } = await db
-      .from('characters')
-      .insert({
-        campaign_id: campaignId,
-        user_id: session.user.id,
-        name: 'Aventureiro',
-        class: 'A definir',
-        level: 1,
-        experience: 0,
-        attributes: {
-          strength: 5,
-          dexterity: 5,
-          constitution: 5,
-          intelligence: 5,
-          wisdom: 5,
-          charisma: 5
-        },
-        resources: {
-          hp: 20,
-          hp_max: 20,
-          mana: 10,
-          mana_max: 10
-        }
-      });
-
-    if (error) throw error;
-  }
-
-  // ==========================================
-  // OPÇÕES DE NARRATIVA
-  // ==========================================
-
-  function renderOptions(options) {
-    const container = $('suggestedChoices');
-
-    if (!container) return;
-
-    container.innerHTML = '';
-
-    (options || []).forEach((option, index) => {
-      const key = option.key || String.fromCharCode(65 + index);
-      const description =
-        typeof option === 'string'
-          ? option
-          : option.text || option.label || '';
-
-      if (!description) return;
-
-      const button = document.createElement('button');
-
-      button.type = 'button';
-
-      button.textContent = key + ' — ' + description;
-
-      button.addEventListener('click', () => {
-        sendChoice(key);
-      });
-
-      container.appendChild(button);
-    });
-  }
-
-  // ==========================================
-  // CARREGAR CAMPANHAS
-  // ==========================================
-
-  async function refreshCampaigns() {
-    const { data, error } = await db
-      .from('campaigns')
-      .select('id,title')
-      .order('updated_at', {
-        ascending: false
-      });
-
-    if (error) throw error;
-
-    const select = $('campaignSelect');
-
-    if (!select) return;
-
-    select.innerHTML =
-      '<option value="">Selecione uma campanha</option>';
-
-    (data || []).forEach(campaign => {
-      const option = document.createElement('option');
-
-      option.value = campaign.id;
-      option.textContent = campaign.title;
-
-      select.appendChild(option);
     });
 
-    if (
-      activeId &&
-      data.some(c => c.id === activeId)
-    ) {
-      select.value = activeId;
-    } else if (data.length) {
-      activeId = data[0].id;
+    $('eterCampaignList').onchange = e => {
+      if (e.target.value) {
+        openCampaign(e.target.value);
+      }
+    };
 
-      select.value = activeId;
-
-      localStorage.setItem(ACTIVE_KEY, activeId);
-    }
-
-    if (activeId) {
-      await loadCampaign(activeId);
-    }
+    renderAttributes();
   }
 
-  async function loadCampaign(id) {
-    const results = await Promise.all([
-      db
-        .from('campaigns')
-        .select('*')
-        .eq('id', id)
-        .single(),
+  function showScreen(id) {
+    document.querySelectorAll('#eterEngine .eter-screen')
+      .forEach(el => el.classList.remove('active'));
 
-      db
-        .from('characters')
-        .select('*')
-        .eq('campaign_id', id)
-        .order('created_at')
-        .limit(1),
+    $(id)?.classList.add('active');
+  }
 
-      db
-        .from('narrative_turns')
-        .select('*')
-        .eq('campaign_id', id)
-        .order('turn_number')
-    ]);
+  function message(text) {
+    if ($('eterMessage')) $('eterMessage').textContent = text;
+  }
 
-    const campaign = results[0].data;
-    const character = results[1].data?.[0];
-    const turns = results[2].data;
+  function feedback(text) {
+    if ($('eterFeedback')) $('eterFeedback').textContent = text;
+  }
 
-    if (results[0].error) throw results[0].error;
-    if (results[1].error) throw results[1].error;
-    if (results[2].error) throw results[2].error;
+  // =============================================
+  // ATRIBUTOS E CRIAÇÃO
+  // =============================================
 
-    activeId = id;
+  function renderAttributes() {
+    const box = $('eterAttributes');
+    if (!box) return;
 
-    localStorage.setItem(ACTIVE_KEY, id);
+    box.innerHTML = '';
 
-    $('campaignTitle').value =
-      campaign.title || '';
+    ATTRIBUTES.forEach(([key, label]) => {
+      const div = document.createElement('div');
+      div.className = 'eter-attribute';
 
-    $('campaignPremise').value =
-      campaign.premise || '';
-
-    $('campaignStory').value =
-      campaign.world_canon || '';
-
-    $('campaignRules').value =
-      campaign.house_rules || '';
-
-    $('playerAction').disabled = false;
-    $('sendAction').disabled = false;
-
-    if ($('storyLog')) {
-      $('storyLog').innerHTML = '';
-    }
-
-    if (!turns.length) {
-      $('storyLog').innerHTML = `
-        <div class="story-empty">
-          Sua aventura começa agora.
-          Descreva sua primeira ação!
+      div.innerHTML = `
+        <div>${label}</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px">
+          <button data-minus="${key}">−</button>
+          <strong id="attr-${key}">5</strong>
+          <button data-plus="${key}">+</button>
         </div>
       `;
-    }
 
-    turns.forEach(turn => {
-      addEntry(
-        'master',
-        'MESTRE DE MESA',
-        turn.scene_text
-      );
-
-      renderOptions(turn.options);
-
-      if (turn.image_url && $('sceneImage')) {
-        $('sceneImage').style.backgroundImage =
-          `url("${turn.image_url}")`;
-
-        $('sceneImage').classList.add('has-image');
-      }
+      box.appendChild(div);
     });
 
-    renderCharacter(character);
+    box.onclick = e => {
+      const plus = e.target.dataset.plus;
+      const minus = e.target.dataset.minus;
 
-    feedback('Campanha carregada.');
-  }
+      if (plus && points > 0) {
+        const el = $('attr-' + plus);
+        const value = Number(el.textContent);
 
-  // ==========================================
-  // CRIAR CAMPANHA
-  // ==========================================
-
-  async function createCampaign() {
-    if (!session?.user) {
-      throw new Error('Entre na sua conta primeiro.');
-    }
-
-    const title =
-      $('campaignTitle').value.trim() ||
-      'Nova campanha';
-
-    const premise =
-      $('campaignPremise').value.trim();
-
-    const world =
-      $('campaignStory').value.trim();
-
-    const rules =
-      $('campaignRules').value.trim();
-
-    const { data: campaign, error } = await db
-      .from('campaigns')
-      .insert({
-        user_id: session.user.id,
-        title,
-        premise,
-        world_canon: world,
-        house_rules: rules
-      })
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    try {
-      await db
-        .from('game_sessions')
-        .insert({
-          campaign_id: campaign.id,
-          user_id: session.user.id,
-          current_region: 'Região inicial',
-          world_state: {}
-        });
-
-      await createCharacter(campaign.id);
-
-    } catch (error) {
-      feedback(
-        'Campanha criada, mas houve um problema ao criar personagem ou sessão: ' +
-        errorMessage(error)
-      );
-    }
-
-    activeId = campaign.id;
-
-    localStorage.setItem(ACTIVE_KEY, activeId);
-
-    await refreshCampaigns();
-
-    await loadCampaign(activeId);
-
-    feedback('Nova campanha criada!');
-  }
-
-  // ==========================================
-  // SALVAR CAMPANHA
-  // ==========================================
-
-  async function saveCampaign() {
-    if (!activeId) {
-      throw new Error('Selecione uma campanha.');
-    }
-
-    const { error } = await db
-      .from('campaigns')
-      .update({
-        title: $('campaignTitle').value.trim(),
-        premise: $('campaignPremise').value.trim(),
-        world_canon: $('campaignStory').value.trim(),
-        house_rules: $('campaignRules').value.trim(),
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', activeId);
-
-    if (error) throw error;
-
-    feedback('Campanha salva com sucesso!');
-  }
-
-  // ==========================================
-  // CONEXÃO COM AS IAs
-  // ==========================================
-
-  async function processAction(payload) {
-    const { data, error } =
-      await db.functions.invoke(
-        'submit-player-action',
-        {
-          body: payload
-        }
-      );
-
-    if (error) {
-      let message = error.message;
-
-      try {
-        const body = await error.context.json();
-
-        if (body.detail) {
-          message = body.detail;
-        } else if (body.error) {
-          message = body.error;
-        }
-      } catch (_) {}
-
-      throw new Error(message);
-    }
-
-    if (data?.error) {
-      throw new Error(
-        data.detail || data.error
-      );
-    }
-
-    return data;
-  }
-
-  async function sendAction(message) {
-    if (!activeId) {
-      return feedback('Crie ou selecione uma campanha.');
-    }
-
-    if (busy || !message.trim()) return;
-
-    await submitPlayerAction({
-      campaign_id: activeId,
-      input_mode: 'free_text',
-      player_text: message.trim()
-    }, message);
-  }
-
-  async function sendChoice(key) {
-    if (!activeId || busy) return;
-
-    await submitPlayerAction({
-      campaign_id: activeId,
-      input_mode: 'choice',
-      selected_option_key: key
-    }, 'Escolha: ' + key);
-  }
-
-  async function submitPlayerAction(payload, displayText) {
-    busy = true;
-
-    $('sendAction').disabled = true;
-    $('playerAction').disabled = true;
-
-    addEntry('player', 'VOCÊ', displayText);
-
-    feedback(
-      'Administrador de regras e Mestre Narrador trabalhando...'
-    );
-
-    try {
-      const result = await processAction(payload);
-
-      if (result.administrator) {
-        const a = result.administrator;
-
-        if (a.roll !== null && a.roll !== undefined) {
-          addEntry(
-            'master',
-            'RESULTADO DO TESTE',
-            'D20: ' + a.roll +
-            ' | Modificador: ' + a.modifier +
-            ' | Total: ' + a.total +
-            ' | Dificuldade: ' + a.difficulty +
-            ' | ' + (a.success ? 'SUCESSO' : 'FALHA')
-          );
+        if (value < 18) {
+          el.textContent = value + 1;
+          points--;
         }
       }
 
-      if (result.narrative?.scene_text) {
-        addEntry(
-          'master',
-          'MESTRE DE MESA',
-          result.narrative.scene_text
-        );
+      if (minus) {
+        const el = $('attr-' + minus);
+        const value = Number(el.textContent);
 
-        renderOptions(result.narrative.options);
-      }
-
-      const providers = result.providers || {};
-
-      feedback(
-        'Turno concluído! Administrador: ' +
-        (providers.administrator?.provider || 'OK') +
-        ' | Mestre: ' +
-        (providers.master?.provider || 'OK')
-      );
-
-      await loadCampaign(activeId);
-
-    } catch (error) {
-      addEntry(
-        'master',
-        'SISTEMA',
-        errorMessage(error)
-      );
-
-      feedback(
-        'Erro ao processar ação: ' +
-        errorMessage(error)
-      );
-
-    } finally {
-      busy = false;
-
-      $('sendAction').disabled = false;
-      $('playerAction').disabled = false;
-      $('playerAction').value = '';
-    }
-  }
-
-  // ==========================================
-  // DADOS
-  // ==========================================
-
-  function rollD20() {
-    const result =
-      Math.floor(Math.random() * 20) + 1;
-
-    let message = 'Resultado: ' + result;
-
-    if (result === 20) {
-      message += ' — CRÍTICO!';
-    }
-
-    if (result === 1) {
-      message += ' — FALHA CRÍTICA!';
-    }
-
-    addEntry(
-      'master',
-      'MESA DE DADOS',
-      message
-    );
-  }
-
-  // ==========================================
-  // EVENTOS DA INTERFACE
-  // ==========================================
-
-  function bindEvents() {
-    $('createCampaign')?.addEventListener(
-      'click',
-      () => createCampaign().catch(e => feedback(errorMessage(e)))
-    );
-
-    $('campaignSelect')?.addEventListener(
-      'change',
-      event => {
-        if (event.target.value) {
-          loadCampaign(event.target.value)
-            .catch(e => feedback(errorMessage(e)));
+        if (value > 5) {
+          el.textContent = value - 1;
+          points++;
         }
       }
-    );
 
-    $('saveCampaignRules')?.addEventListener(
-      'click',
-      () => saveCampaign().catch(e => feedback(errorMessage(e)))
-    );
-
-    $('sendAction')?.addEventListener(
-      'click',
-      () => sendAction($('playerAction').value)
-    );
-
-    $('playerAction')?.addEventListener(
-      'keydown',
-      event => {
-        if (
-          event.key === 'Enter' &&
-          !event.shiftKey
-        ) {
-          event.preventDefault();
-
-          sendAction($('playerAction').value);
-        }
-      }
-    );
-
-    $('rollD20')?.addEventListener(
-      'click',
-      rollD20
-    );
+      $('eterPoints').textContent =
+        'Pontos disponíveis: ' + points;
+    };
   }
 
-  // ==========================================
-  // INICIALIZAÇÃO
-  // ==========================================
+  function getAttributes() {
+    const result = {};
 
-  function loadSupabaseSDK() {
+    ATTRIBUTES.forEach(([key]) => {
+      result[key] = Number($('attr-' + key).textContent);
+    });
+
+    return result;
+  }
+
+  // =============================================
+  // SUPABASE
+  // =============================================
+
+  function loadSDK() {
     return new Promise((resolve, reject) => {
       if (window.supabase?.createClient) {
         resolve();
@@ -790,12 +527,7 @@
         'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js';
 
       script.onload = resolve;
-
-      script.onerror = () => {
-        reject(
-          new Error('Não foi possível carregar o Supabase.')
-        );
-      };
+      script.onerror = () => reject(new Error('Falha ao carregar Supabase.'));
 
       document.head.appendChild(script);
     });
@@ -803,88 +535,506 @@
 
   async function initialize() {
     try {
-      await loadSupabaseSDK();
+      installStyle();
+      installInterface();
+
+      await loadSDK();
 
       db = window.supabase.createClient(
         SUPABASE_URL,
         SUPABASE_KEY
       );
 
-      bindEvents();
+      const { data, error } = await db.auth.getSession();
 
-      createAuthScreen();
-
-      const { data } = await db.auth.getSession();
+      if (error) throw error;
 
       session = data.session;
 
-      db.auth.onAuthStateChange(
-        async (_event, newSession) => {
-          session = newSession;
+      db.auth.onAuthStateChange((_event, newSession) => {
+        session = newSession;
 
-          showAuth(!newSession);
-
-          if (newSession) {
-            setStatus('● Conta conectada ao Supabase');
-
-            try {
-              await refreshCampaigns();
-            } catch (error) {
-              feedback(errorMessage(error));
-            }
-          } else {
-            activeId = '';
-            localStorage.removeItem(ACTIVE_KEY);
-
-            setStatus('● Faça login para jogar');
-          }
+        if (session) {
+          refreshCampaigns().catch(e => message(e.message));
+        } else {
+          campaignId = null;
+          showScreen('eterHome');
+          message('Entre para acessar sua jornada.');
         }
-      );
+      });
 
       if (!session) {
-        showAuth(true);
-
-        setStatus(
-          '● Supabase conectado · aguardando login'
-        );
-
+        message('Faça login para começar sua aventura.');
         return;
       }
 
-      showAuth(false);
+      $('maiStatus').textContent = 'Gemini conectado via backend';
+      $('otaStatus').textContent = 'Groq conectado via backend';
 
-      setStatus(
-        '● Supabase conectado · conta autenticada'
-      );
-
-      if ($('masterStatus')) {
-        $('masterStatus').textContent =
-          'Gemini · Mestre Narrador';
-      }
-
-      if ($('adminStatus')) {
-        $('adminStatus').textContent =
-          'Groq · Administrador de Regras';
-      }
-
-      if ($('imageStatus')) {
-        $('imageStatus').textContent =
-          'Geração de imagens ainda não conectada';
-      }
+      message('Conta conectada. Preparando suas campanhas...');
 
       await refreshCampaigns();
 
     } catch (error) {
       console.error(error);
-
-      setStatus(
-        '● Erro de conexão com o sistema'
-      );
-
-      feedback(errorMessage(error));
+      message('Erro: ' + error.message);
     }
   }
 
-  initialize();
+  // =============================================
+  // CAMPANHAS
+  // =============================================
+
+  async function refreshCampaigns() {
+    if (!session) return;
+
+    const { data, error } = await db
+      .from('campaigns')
+      .select('id,title,updated_at')
+      .eq('user_id', session.user.id)
+      .order('updated_at', { ascending: false });
+
+    if (error) throw error;
+
+    const select = $('eterCampaignList');
+
+    select.innerHTML = '<option value="">Escolha uma campanha</option>';
+
+    (data || []).forEach(c => {
+      const option = document.createElement('option');
+      option.value = c.id;
+      option.textContent = c.title;
+      select.appendChild(option);
+    });
+
+    message((data || []).length + ' campanha(s) encontrada(s).');
+  }
+
+  async function startNewCampaign() {
+    if (busy) return;
+
+    try {
+      if (!session) throw new Error('Você precisa entrar na conta.');
+
+      const name = $('eterName').value.trim();
+      const title = $('eterCampaignName').value.trim();
+      const race = $('eterRace').value;
+      const playerClass = $('eterClass').value;
+      const premise = $('eterPremise').value.trim();
+
+      if (!name) throw new Error('Digite o nome do personagem.');
+      if (!title) throw new Error('Digite o nome da campanha.');
+      if (points !== 0) {
+        throw new Error('Distribua todos os 12 pontos de atributos.');
+      }
+
+      busy = true;
+      message('Criando seu mundo e personagem...');
+
+      const { data: campaign, error: campaignError } = await db
+        .from('campaigns')
+        .insert({
+          user_id: session.user.id,
+          title,
+          premise: premise || 'Uma aventura medieval de fantasia.',
+          world_canon: 'Mundo de fantasia medieval de Crônicas de Éter.',
+          house_rules:
+            'OTA administra as regras, testes, dados, atributos e consequências. Maiar narra a aventura e interpreta o mundo.'
+        })
+        .select()
+        .single();
+
+      if (campaignError) throw campaignError;
+
+      campaignId = campaign.id;
+
+      const attributes = {
+        ...getAttributes(),
+        race
+      };
+
+      const { data: createdCharacter, error: charError } = await db
+        .from('characters')
+        .insert({
+          campaign_id: campaignId,
+          user_id: session.user.id,
+          name,
+          class: playerClass,
+          level: 1,
+          experience: 0,
+          attributes,
+          resources: {
+            hp: 20 + attributes.con,
+            hp_max: 20 + attributes.con,
+            mana: 10 + attributes.int,
+            mana_max: 10 + attributes.int,
+            stamina: 10 + attributes.for
+          }
+        })
+        .select()
+        .single();
+
+      if (charError) throw charError;
+
+      character = createdCharacter;
+
+      const { error: sessionError } = await db
+        .from('game_sessions')
+        .insert({
+          campaign_id: campaignId,
+          user_id: session.user.id,
+          status: 'active',
+          current_region: 'Ponto de partida',
+          world_state: {
+            chapter: 1,
+            day: 1,
+            started: true
+          }
+        });
+
+      if (sessionError) throw sessionError;
+
+      await refreshCampaigns();
+
+      await openCampaign(campaignId);
+
+      feedback('Personagem criado. Maiar está preparando sua primeira cena...');
+
+      await submitAction({
+        campaign_id: campaignId,
+        input_mode: 'free_text',
+        player_text:
+          'MAIAR: inicie a aventura do zero. Apresente o mundo, a situação inicial, o local onde meu personagem começa e um acontecimento que permita que eu escolha como agir. Respeite minha raça, classe e atributos. Não pule a introdução.'
+      }, false);
+
+    } catch (error) {
+      console.error(error);
+      message('Erro ao criar aventura: ' + error.message);
+      feedback(error.message);
+    } finally {
+      busy = false;
+    }
+  }
+
+  async function continueCampaign() {
+    const selected = $('eterCampaignList').value;
+
+    if (selected) {
+      await openCampaign(selected);
+      return;
+    }
+
+    const { data, error } = await db
+      .from('campaigns')
+      .select('id')
+      .eq('user_id', session.user.id)
+      .order('updated_at', { ascending: false })
+      .limit(1);
+
+    if (error) {
+      message(error.message);
+      return;
+    }
+
+    if (!data?.length) {
+      message('Você ainda não possui uma campanha. Comece do zero!');
+      showScreen('eterCreation');
+      return;
+    }
+
+    await openCampaign(data[0].id);
+  }
+
+  async function openCampaign(id) {
+    try {
+      campaignId = id;
+
+      const { data: campaign, error: campError } = await db
+        .from('campaigns')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (campError) throw campError;
+
+      const { data: chars, error: charError } = await db
+        .from('characters')
+        .select('*')
+        .eq('campaign_id', id)
+        .order('created_at')
+        .limit(1);
+
+      if (charError) throw charError;
+
+      character = chars?.[0] || null;
+
+      if (!character) {
+        throw new Error('Esta campanha não possui personagem.');
+      }
+
+      $('eterJourneyTitle').textContent = campaign.title;
+
+      $('eterCharacter').textContent =
+        character.name + ' · ' +
+        (character.attributes?.race || 'Raça não definida') +
+        ' · ' + character.class +
+        ' · Nível ' + character.level +
+        ' · XP ' + character.experience;
+
+      showScreen('eterJourney');
+
+      await loadNarrative();
+
+      message('Jornada carregada. Maiar está à sua espera.');
+
+    } catch (error) {
+      message('Erro ao abrir campanha: ' + error.message);
+    }
+  }
+
+  // =============================================
+  // HISTÓRIA E NARRATIVA
+  // =============================================
+
+  function addStory(label, content, type) {
+    const box = $('eterStory');
+
+    const entry = document.createElement('div');
+    entry.className = 'eter-entry ' + (type || '');
+
+    const title = document.createElement('small');
+    title.textContent = label;
+
+    const text = document.createElement('div');
+    text.className = 'eter-scene';
+    text.textContent = content || '';
+
+    entry.append(title, text);
+    box.appendChild(entry);
+
+    box.scrollTop = box.scrollHeight;
+  }
+
+  async function loadNarrative() {
+    const { data, error } = await db
+      .from('narrative_turns')
+      .select('*')
+      .eq('campaign_id', campaignId)
+      .order('turn_number');
+
+    if (error) throw error;
+
+    const box = $('eterStory');
+    box.innerHTML = '';
+
+    if (!data?.length) {
+      box.textContent = 'Esta aventura ainda não possui cenas.';
+      return;
+    }
+
+    data.forEach(turn => {
+      addStory('MAIAR · MESTRE NARRADOR', turn.scene_text, 'maiar');
+    });
+
+    renderChoices(data[data.length - 1].options || []);
+  }
+
+  function renderChoices(options) {
+    const box = $('eterOptions');
+    box.innerHTML = '';
+
+    (options || []).forEach(option => {
+      const button = document.createElement('button');
+      button.className = 'eter-option';
+
+      const key = option.key;
+      const text = option.text || option.label || '';
+
+      button.textContent = key + ' — ' + text;
+
+      button.onclick = () => {
+        sendChoice(key);
+      };
+
+      box.appendChild(button);
+    });
+
+    const free = document.createElement('div');
+    free.className = 'eter-muted';
+    free.textContent = 'Ou escreva sua própria ação abaixo.';
+    box.appendChild(free);
+  }
+
+  // =============================================
+  // OTA + MAIAR
+  // =============================================
+
+  async function callGameAI(payload) {
+    const { data, error } = await db.functions.invoke(
+      'submit-player-action',
+      { body: payload }
+    );
+
+    if (error) {
+      let detail = error.message;
+
+      try {
+        const response = await error.context.json();
+        detail = response.detail || response.error || detail;
+      } catch (_) {}
+
+      throw new Error(detail);
+    }
+
+    if (data?.error) {
+      throw new Error(data.detail || data.error);
+    }
+
+    return data;
+  }
+
+  async function sendFreeAction() {
+    const text = $('eterAction').value.trim();
+
+    if (!text) {
+      feedback('Escreva sua ação antes de enviar.');
+      return;
+    }
+
+    await submitAction({
+      campaign_id: campaignId,
+      input_mode: 'free_text',
+      player_text: text
+    }, true);
+  }
+
+  async function sendChoice(key) {
+    await submitAction({
+      campaign_id: campaignId,
+      input_mode: 'choice',
+      selected_option_key: key
+    }, true);
+  }
+
+  async function submitAction(payload, showPlayerText) {
+    if (busy || !campaignId) return;
+
+    busy = true;
+
+    $('eterSend').disabled = true;
+    $('eterOptions').querySelectorAll('button').forEach(b => b.disabled = true);
+
+    if (showPlayerText) {
+      addStory(
+        'SUA AÇÃO',
+        payload.player_text || 'Escolha: ' + payload.selected_option_key,
+        'player'
+      );
+    }
+
+    $('maiStatus').textContent = 'Narrando...';
+    $('otaStatus').textContent = 'Validando regras...';
+
+    feedback('OTA está analisando sua ação. Maiar está preparando a resposta...');
+
+    try {
+      const result = await callGameAI(payload);
+
+      const admin = result.administrator || {};
+
+      $('otaStatus').textContent =
+        result.providers?.administrator?.provider
+          ? 'Ativo · ' + result.providers.administrator.provider
+          : 'Ação validada';
+
+      if (admin.roll !== null && admin.roll !== undefined) {
+        addStory(
+          'OTA · RESULTADO DOS DADOS',
+          'D20: ' + admin.roll +
+          ' | Modificador: ' + admin.modifier +
+          ' | Total: ' + admin.total +
+          ' | Dificuldade: ' + admin.difficulty +
+          ' | ' + (admin.success ? 'SUCESSO' : 'FALHA'),
+          ''
+        );
+      }
+
+      const narrative = result.narrative;
+
+      if (narrative?.scene_text) {
+        addStory(
+          'MAIAR · MESTRE NARRADOR',
+          narrative.scene_text,
+          'maiar'
+        );
+
+        renderChoices(narrative.options || []);
+      } else {
+        throw new Error('Maiar não retornou uma cena.');
+      }
+
+      $('maiStatus').textContent =
+        result.providers?.master?.provider
+          ? 'Ativo · ' + result.providers.master.provider
+          : 'Cena criada';
+
+      $('eterAction').value = '';
+
+      feedback('Turno concluído. Sua jornada continua.');
+
+      await refreshCharacter();
+
+    } catch (error) {
+      console.error(error);
+
+      addStory('SISTEMA', error.message, '');
+
+      feedback('Não foi possível concluir o turno: ' + error.message);
+
+      $('maiStatus').textContent = 'Erro';
+      $('otaStatus').textContent = 'Verificar conexão';
+
+    } finally {
+      busy = false;
+
+      $('eterSend').disabled = false;
+      $('eterOptions').querySelectorAll('button').forEach(b => b.disabled = false);
+    }
+  }
+
+  async function refreshCharacter() {
+    if (!campaignId) return;
+
+    const { data } = await db
+      .from('characters')
+      .select('*')
+      .eq('campaign_id', campaignId)
+      .order('created_at')
+      .limit(1)
+      .maybeSingle();
+
+    if (data) {
+      character = data;
+
+      $('eterCharacter').textContent =
+        character.name + ' · ' +
+        (character.attributes?.race || '') +
+        ' · ' + character.class +
+        ' · Nível ' + character.level +
+        ' · XP ' + character.experience;
+    }
+  }
+
+  // =============================================
+  // INICIAR
+  // =============================================
+
+  document.addEventListener('DOMContentLoaded', () => {
+    initialize();
+  });
+
+  if (document.readyState !== 'loading') {
+    initialize();
+  }
 
 })();
