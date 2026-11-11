@@ -313,7 +313,6 @@ function renderCharacter(ch){
  }
 }
 
-/* RENDERIZA A CENA E AS ESCOLHAS */
 function renderTurn(t,playerAction){
  const log=$("storyLog");
  if(!log||!t)return;
@@ -382,7 +381,6 @@ function renderTurn(t,playerAction){
  log.scrollTop=log.scrollHeight;
 }
 
-/* CARREGA CAMPANHA E VERIFICA MORTE PERMANENTE */
 async function loadCampaign(id,optimisticTurn=null,optimisticAction=''){
  if(!session||!id)return;
  campaignId=id;
@@ -540,7 +538,6 @@ async function saveRules(){
  );
 }
 
-/* ENVIA AÇÃO E SINCRONIZA A RESPOSTA */
 async function send(payload){
  if(!session||!campaignId||busy)return;
  if(characterDead||window.eterCharacterDead){
