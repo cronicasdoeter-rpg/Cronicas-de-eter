@@ -18,19 +18,13 @@ const msg=(id,t,bad)=>{
 };
 
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({
- "&":"&amp;",
- "<":"&lt;",
- ">":"&gt;",
- '"':"&quot;",
- "'":"&#39;"
+ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
 }[c]));
 
 function styles(){
  if($("eterSoloStyles"))return;
-
  const s=document.createElement("style");
  s.id="eterSoloStyles";
-
  s.textContent=
  'body.eter-locked .shell{visibility:hidden!important;pointer-events:none!important}'+
  '#eterAuthLayer{position:fixed;inset:0;z-index:2147483000;display:grid;place-items:center;padding:18px;background:radial-gradient(ellipse at top,#29364b,#10141e 65%,#080a10);color:#eee8dc;font-family:Inter,system-ui}'+
@@ -72,16 +66,13 @@ function styles(){
  '#solo .jc-meta{grid-column:1/-1;color:#c5bda9;font-size:11px}'+
  '#solo .composer{gap:8px}'+
  '@media(max-width:600px){#solo .composer{flex-direction:column}#solo .journey-character{grid-template-columns:1fr 1fr}}';
-
  document.head.appendChild(s);
 }
 
 function authUI(){
-
  if(!$("eterAuthLayer")){
   const e=document.createElement("div");
   e.id="eterAuthLayer";
-
   e.innerHTML=
    '<section class="eter-box">'+
    '<div style="font-size:11px;letter-spacing:3px;color:#e6c68d">CRÔNICAS DE ÉTER</div>'+
@@ -97,7 +88,6 @@ function authUI(){
    '</div>'+
    '<div id="eterAuthNotice"></div>'+
    '</section>';
-
   document.body.appendChild(e);
  }
 
@@ -105,7 +95,6 @@ function authUI(){
   const e=document.createElement("div");
   e.id="eterSettings";
   e.hidden=true;
-
   e.innerHTML=
    '<section class="eter-box">'+
    '<h2>Configurações da conta</h2>'+
@@ -130,7 +119,6 @@ function authUI(){
    '<button class="eter-btn alt" id="eterCloseSettings">FECHAR</button>'+
    '</div>'+
    '</section>';
-
   document.body.appendChild(e);
  }
 
@@ -143,7 +131,6 @@ function authUI(){
 
  $("eterLogin").onclick=()=>auth("login","eterEmail","eterPassword","eterAuthNotice");
  $("eterRegister").onclick=()=>auth("register","eterEmail","eterPassword","eterAuthNotice");
-
  $("eterLogin2").onclick=()=>auth("login","eterEmail2","eterPassword2","eterSettingsNotice");
  $("eterRegister2").onclick=()=>auth("register","eterEmail2","eterPassword2","eterSettingsNotice");
 
@@ -158,7 +145,6 @@ function authUI(){
 
  $("eterSettingsButton").onclick=()=>$("eterSettings").hidden=false;
  $("eterCloseSettings").onclick=()=>$("eterSettings").hidden=true;
-
  $("eterSettings").onclick=e=>{
   if(e.target.id==="eterSettings")e.currentTarget.hidden=true;
  };
@@ -166,21 +152,16 @@ function authUI(){
 
 function lockUI(){
  const yes=!!session?.user;
-
  document.body.classList.toggle("eter-locked",!yes);
  $("eterAuthLayer").hidden=yes;
-
  $("eterSettingsOut").hidden=yes;
  $("eterSettingsIn").hidden=!yes;
-
  $("eterUserLabel").textContent=yes
   ?"Conectado: "+session.user.email
   :"Nenhuma conta conectada";
-
  $("eterSettingsButton").textContent=yes
   ?"⚙ Configurações"
   :"⚙ Entrar";
-
  if(!yes){
   $("playerAction")?.setAttribute("disabled","");
   $("sendAction")?.setAttribute("disabled","");
@@ -190,22 +171,15 @@ function lockUI(){
 async function auth(kind,emailId,passId,nid){
  const email=$(emailId).value.trim();
  const password=$(passId).value;
-
- if(!email||!password)
-  return msg(nid,"Preencha e-mail e senha.",true);
-
+ if(!email||!password)return msg(nid,"Preencha e-mail e senha.",true);
  if(kind==="register"&&password.length<6)
   return msg(nid,"A senha precisa ter pelo menos 6 caracteres.",true);
-
  msg(nid,kind==="login"?"Entrando...":"Criando conta...");
-
  try{
   const r=kind==="login"
    ?await db.auth.signInWithPassword({email,password})
    :await db.auth.signUp({email,password});
-
   if(r.error)throw r.error;
-
   if(r.data.session){
    session=r.data.session;
    lockUI();
@@ -222,7 +196,6 @@ async function auth(kind,emailId,passId,nid){
 
 function addJourneyTab(){
  const nav=$("nav");
-
  if(nav&&!nav.querySelector('[data-tab="solo"]')){
   const b=document.createElement("button");
   b.dataset.tab="solo";
@@ -234,23 +207,18 @@ function addJourneyTab(){
 function addTools(){
  const sel=$("campaignSelect");
  if(!sel||$("eterSoloTools"))return;
-
  const w=document.createElement("div");
  w.id="eterSoloTools";
  w.className="solo-tools";
-
  w.innerHTML=
   '<button class="btn ghost" id="eterContinue">▶ Continuar jornada</button>'+
   '<button class="btn ghost" id="eterRestart">↻ Reiniciar em nova campanha</button>';
-
  sel.insertAdjacentElement("afterend",w);
-
  $("eterContinue").onclick=()=>{
   sel.value
    ?loadCampaign(sel.value)
    :msg("turnFeedback","Selecione uma campanha salva.",true);
  };
-
  $("eterRestart").onclick=()=>{
   if($("campaignTitle"))
    $("campaignTitle").value=($("campaignTitle").value||"Minha jornada")+" — Novo começo";
@@ -265,28 +233,22 @@ function setPlay(on){
 
 async function listCampaigns(){
  if(!session)return;
-
  const sel=$("campaignSelect");
-
  const r=await db.from("campaigns")
   .select("id,title,updated_at")
   .eq("user_id",session.user.id)
   .order("updated_at",{ascending:false});
-
  if(r.error){
   msg("turnFeedback","Erro ao buscar campanhas: "+r.error.message,true);
   return;
  }
-
  sel.innerHTML='<option value="">Selecione uma campanha salva</option>';
-
  (r.data||[]).forEach(c=>{
   const o=document.createElement("option");
   o.value=c.id;
   o.textContent=c.title;
   sel.appendChild(o);
  });
-
  if(r.data?.length){
   sel.value=r.data[0].id;
   await loadCampaign(r.data[0].id);
@@ -299,84 +261,53 @@ async function listCampaigns(){
 function renderCharacter(ch){
  const host=$("soloState");
  if(!host)return;
-
  if(!ch){
   host.textContent="Personagem não cadastrado";
   return;
  }
-
  const r=ch.resources||{};
  const a=ch.attributes||{};
-
  const hp=Number(r.hp??0);
  const hpMax=Math.max(1,Number(r.hp_max??r.max_hp??30));
-
  const mana=Number(r.mana??0);
  const manaMax=Math.max(1,Number(r.mana_max??r.max_mana??20));
-
  const stamina=Number(r.stamina??0);
  const staminaMax=Math.max(1,Number(r.stamina_max??r.max_stamina??20));
-
  const attrs=[
-  ["FOR",a.for??a.str??10],
-  ["DES",a.des??a.dex??10],
-  ["CON",a.con??10],
-  ["INT",a.int??10],
-  ["SAB",a.sab??a.wis??10],
-  ["CAR",a.car??a.cha??10]
+  ["FOR",a.for??a.str??10],["DES",a.des??a.dex??10],
+  ["CON",a.con??10],["INT",a.int??10],
+  ["SAB",a.sab??a.wis??10],["CAR",a.car??a.cha??10]
  ];
-
  host.innerHTML=
  '<section class="journey-character">'+
- '<div class="jc-head">'+
-  '<div>'+
-   '<div class="jc-name">🧙 '+esc(ch.name||"Aventureiro")+'</div>'+
-   '<div class="jc-level">'+esc(ch.class||"Viajante")+' · Nível '+esc(ch.level??1)+'</div>'+
-  '</div>'+
-  '<div class="jc-level">✨ '+esc(ch.experience??0)+' XP</div>'+
- '</div>'+
- '<div class="jc-stat">'+
-  '<b>❤️ HP '+hp+' / '+hpMax+'</b>'+
-  '<div class="jc-bar"><i style="width:'+Math.min(100,hp/hpMax*100)+'%"></i></div>'+
- '</div>'+
- '<div class="jc-stat">'+
-  '<b>🔷 Mana '+mana+' / '+manaMax+'</b>'+
-  '<div class="jc-bar mana"><i style="width:'+Math.min(100,mana/manaMax*100)+'%"></i></div>'+
- '</div>'+
- '<div class="jc-stat">'+
-  '<b>⚡ Energia '+stamina+' / '+staminaMax+'</b>'+
-  '<div class="jc-bar mana"><i style="width:'+Math.min(100,stamina/staminaMax*100)+'%"></i></div>'+
- '</div>'+
- '<div class="jc-stat">'+
-  '<b>🪙 Ouro</b>'+
-  esc(r.gold??0)+
- '</div>'+
- '<div class="jc-attrs">'+
-  attrs.map(x=>'<span>'+x[0]+' · '+esc(x[1])+'</span>').join("")+
- '</div>'+
- '<div class="jc-meta">'+
-  '🛡️ Condição: '+
-  esc(Array.isArray(r.status_effects)&&r.status_effects.length
-   ?r.status_effects.join(", ")
-   :"Sem efeitos negativos registrados")+
-  '<br>🎒 Itens: '+
-  (Array.isArray(r.inventory)
-   ?r.inventory.reduce((n,x)=>n+Number(x.quantity||1),0)
-   :0)+
-  ' · Abra o inventário para ver os detalhes.'+
- '</div>'+
- '</section>';
+ '<div class="jc-head"><div>'+
+ '<div class="jc-name">🧙 '+esc(ch.name||"Aventureiro")+'</div>'+
+ '<div class="jc-level">'+esc(ch.class||"Viajante")+' · Nível '+esc(ch.level??1)+'</div>'+
+ '</div><div class="jc-level">✨ '+esc(ch.experience??0)+' XP</div></div>'+
+ '<div class="jc-stat"><b>❤️ HP '+hp+' / '+hpMax+'</b>'+
+ '<div class="jc-bar"><i style="width:'+Math.min(100,hp/hpMax*100)+'%"></i></div></div>'+
+ '<div class="jc-stat"><b>🔷 Mana '+mana+' / '+manaMax+'</b>'+
+ '<div class="jc-bar mana"><i style="width:'+Math.min(100,mana/manaMax*100)+'%"></i></div></div>'+
+ '<div class="jc-stat"><b>⚡ Energia '+stamina+' / '+staminaMax+'</b>'+
+ '<div class="jc-bar mana"><i style="width:'+Math.min(100,stamina/staminaMax*100)+'%"></i></div></div>'+
+ '<div class="jc-stat"><b>🪙 Ouro</b>'+esc(r.gold??0)+'</div>'+
+ '<div class="jc-attrs">'+attrs.map(x=>'<span>'+x[0]+' · '+esc(x[1])+'</span>').join("")+'</div>'+
+ '<div class="jc-meta">🛡️ Condição: '+
+ esc(Array.isArray(r.status_effects)&&r.status_effects.length
+  ?r.status_effects.join(", "):"Sem efeitos negativos registrados")+
+ '<br>🎒 Itens: '+
+ (Array.isArray(r.inventory)?r.inventory.reduce((n,x)=>n+Number(x.quantity||1),0):0)+
+ ' · Abra o inventário para ver os detalhes.</div></section>';
 }
 
+/* RENDERIZA A CENA E AS ESCOLHAS */
 function renderTurn(t,playerAction){
  const log=$("storyLog");
  if(!log||!t)return;
-
  log.querySelector(".story-empty")?.remove();
 
  const a=document.createElement("article");
  a.className="story-turn";
-
  const h=document.createElement("small");
  h.textContent="📜 CENA "+(t.turn_number??"");
  a.appendChild(h);
@@ -390,11 +321,9 @@ function renderTurn(t,playerAction){
 
  const body=document.createElement("div");
  const raw=String(t.scene_text||"");
-
  raw.split(/\n+/).filter(Boolean).forEach(line=>{
   const m=line.match(/^\s*([A-ZÀ-Ú][^:\n]{1,35}):\s*(.+)$/u);
   const d=document.createElement("div");
-
   if(m){
    d.className="story-dialogue";
    const who=document.createElement("strong");
@@ -409,62 +338,56 @@ function renderTurn(t,playerAction){
    d.className="story-narrator";
    d.textContent="📖 "+line;
   }
-
   body.appendChild(d);
  });
-
  a.appendChild(body);
  log.appendChild(a);
 
  const box=$("suggestedChoices");
-
  if(box){
   box.innerHTML="";
-  (t.options||[]).forEach(o=>{
+  let options=Array.isArray(t.options)?t.options:[];
+  if(typeof t.options==="string"){
+   try{options=JSON.parse(t.options)}catch{options=[]}
+  }
+  options.forEach((o,i)=>{
+   const key=String(o?.key||String.fromCharCode(65+i));
+   const choiceText=String(o?.text||o?.label||o||"").trim();
+   if(!choiceText)return;
    const b=document.createElement("button");
    b.className="btn ghost";
-   b.textContent=(o.key?o.key+" · ":"")+o.text;
+   b.textContent=key+" · "+choiceText;
    b.onclick=()=>send({
     input_mode:"choice",
-    selected_option_key:o.key
+    selected_option_key:key,
+    display_text:choiceText
    });
    box.appendChild(b);
   });
  }
-
  log.scrollTop=log.scrollHeight;
 }
 
-async function loadCampaign(id){
+/* CARREGA CAMPANHA E EVITA DUPLICAR A CENA RECÉM-RECEBIDA */
+async function loadCampaign(id,optimisticTurn=null,optimisticAction=''){
  if(!session||!id)return;
-
  campaignId=id;
  setPlay(false);
-
  msg("turnFeedback","Carregando jornada salva...");
 
  const q=await Promise.all([
-  db.from("campaigns")
-   .select("*")
-   .eq("id",id)
-   .eq("user_id",session.user.id)
-   .single(),
-
+  db.from("campaigns").select("*")
+   .eq("id",id).eq("user_id",session.user.id).single(),
   db.from("narrative_turns")
    .select("id,turn_number,scene_text,options,scene_state,image_url")
-   .eq("campaign_id",id)
-   .eq("user_id",session.user.id)
+   .eq("campaign_id",id).eq("user_id",session.user.id)
    .order("turn_number",{ascending:true}),
-
   db.from("characters")
    .select("name,class,level,experience,attributes,resources")
-   .eq("campaign_id",id)
-   .eq("user_id",session.user.id)
-   .limit(1)
-   .maybeSingle()
+   .eq("campaign_id",id).eq("user_id",session.user.id)
+   .limit(1).maybeSingle()
  ]);
 
- // CORREÇÃO: também verifica erros na consulta do personagem.
  if(q[0].error||q[1].error||q[2].error){
   msg("turnFeedback",(q[0].error||q[1].error||q[2].error).message,true);
   return;
@@ -472,37 +395,32 @@ async function loadCampaign(id){
 
  const c=q[0].data;
  const turns=q[1].data||[];
+ if(optimisticTurn&&optimisticTurn.id&&!turns.some(t=>t.id===optimisticTurn.id))
+  turns.push(optimisticTurn);
  const ch=q[2].data;
 
- if($("campaignTitle"))
-  $("campaignTitle").value=c.title||"";
-
- if($("campaignPremise"))
-  $("campaignPremise").value=c.premise||"";
-
- if($("campaignStory"))
-  $("campaignStory").value=c.world_canon||"";
-
- if($("campaignRules"))
-  $("campaignRules").value=c.house_rules||"";
+ if($("campaignTitle"))$("campaignTitle").value=c.title||"";
+ if($("campaignPremise"))$("campaignPremise").value=c.premise||"";
+ if($("campaignStory"))$("campaignStory").value=c.world_canon||"";
+ if($("campaignRules"))$("campaignRules").value=c.house_rules||"";
 
  $("storyLog").innerHTML="";
-
  if(turns.length){
-  turns.forEach(t=>renderTurn(t));
+  turns.forEach(t=>renderTurn(
+   t,
+   optimisticTurn&&t.id===optimisticTurn.id?optimisticAction:""
+  ));
  }else{
   $("storyLog").innerHTML=
    '<div class="story-empty">Campanha criada. Envie sua primeira ação para começar.</div>';
+  if($("suggestedChoices"))$("suggestedChoices").innerHTML="";
  }
 
  renderCharacter(ch);
-
  setPlay(true);
-
  msg("turnFeedback","Jornada carregada: "+c.title+". "+turns.length+" cenas salvas.");
-
  $("soloStatus").textContent="● Jornada conectada";
- $("masterStatus").textContent="MAIAR · Gemini";
+ $("masterStatus").textContent="MAIAR · Groq principal / Gemini reserva";
  $("adminStatus").textContent="OTA · Groq";
 }
 
@@ -511,12 +429,9 @@ async function createCampaign(){
   $("eterSettings").hidden=false;
   return;
  }
-
  if(busy)return;
-
  busy=true;
  setPlay(false);
-
  msg("turnFeedback","Criando campanha e personagem...");
 
  try{
@@ -524,81 +439,49 @@ async function createCampaign(){
   const premise=$("campaignPremise").value.trim()||"Uma aventura de fantasia medieval.";
   const world=$("campaignWorld").value.trim();
   const story=$("campaignStory").value.trim();
-
   const rules=$("campaignRules").value.trim()||
    "Testes com D20 + modificador contra dificuldade.";
 
   const c=await db.from("campaigns").insert({
-   user_id:session.user.id,
-   title,
-   premise,
+   user_id:session.user.id,title,premise,
    world_canon:[world,story].filter(Boolean).join("\n\n"),
    house_rules:rules
   }).select("id").single();
-
   if(c.error)throw c.error;
 
   const ch=await db.from("characters").insert({
-   campaign_id:c.data.id,
-   user_id:session.user.id,
-   name:"Aventureiro",
-   class:"Viajante",
-   level:1,
-   experience:0,
-   attributes:{
-    for:10,
-    des:10,
-    con:10,
-    int:10,
-    sab:10,
-    car:10
-   },
+   campaign_id:c.data.id,user_id:session.user.id,
+   name:"Aventureiro",class:"Viajante",level:1,experience:0,
+   attributes:{for:10,des:10,con:10,int:10,sab:10,car:10},
    resources:{
-    hp:30,
-    hp_max:30,
-    mana:20,
-    mana_max:20,
-    stamina:20,
-    stamina_max:20,
-    gold:25,
-    inventory:[]
+    hp:30,hp_max:30,mana:20,mana_max:20,
+    stamina:20,stamina_max:20,gold:25,inventory:[]
    }
   });
-
   if(ch.error)throw ch.error;
 
   const se=await db.from("game_sessions").insert({
-   campaign_id:c.data.id,
-   user_id:session.user.id,
-   status:"active",
-   current_region:"Local de partida",
+   campaign_id:c.data.id,user_id:session.user.id,
+   status:"active",current_region:"Local de partida",
    world_state:{chapter:1,day:1}
   });
-
   if(se.error)throw se.error;
 
-  // Atualiza a lista sem deixar uma chamada concorrente bloquear a primeira ação.
   const sel=$("campaignSelect");
   const option=document.createElement("option");
   option.value=c.data.id;
   option.textContent=title;
   sel.appendChild(option);
   sel.value=c.data.id;
-
   campaignId=c.data.id;
 
-  // Carrega os dados antes de liberar o envio.
   await loadCampaign(c.data.id);
-
-  // CORREÇÃO PRINCIPAL: libera busy antes de chamar send().
   busy=false;
 
   await send({
    input_mode:"free_text",
-   player_text:
-    "Comece a jornada. Apresente o cenário inicial, meu personagem, uma situação urgente e escolhas para agir."
+   player_text:"Comece a jornada. Apresente o cenário inicial, meu personagem, uma situação urgente e escolhas para agir."
   });
-
  }catch(e){
   msg("turnFeedback","Erro ao criar jornada: "+e.message,true);
  }finally{
@@ -610,7 +493,6 @@ async function createCampaign(){
 async function saveRules(){
  if(!session||!campaignId)
   return msg("turnFeedback","Selecione uma campanha.",true);
-
  const r=await db.from("campaigns").update({
   title:$("campaignTitle").value.trim(),
   premise:$("campaignPremise").value.trim(),
@@ -621,17 +503,15 @@ async function saveRules(){
   house_rules:$("campaignRules").value.trim(),
   updated_at:new Date().toISOString()
  }).eq("id",campaignId).eq("user_id",session.user.id);
-
- msg(
-  "turnFeedback",
+ msg("turnFeedback",
   r.error?"Erro ao salvar: "+r.error.message:"Regras e cânone salvos.",
   !!r.error
  );
 }
 
+/* ENVIA AÇÃO, MOSTRA TEXTO EM STREAMING E SINCRONIZA */
 async function send(payload){
  if(!session||!campaignId||busy)return;
-
  busy=true;
  setPlay(false);
 
@@ -640,20 +520,13 @@ async function send(payload){
  let liveText="";
  let completed=null;
 
- msg(
-  "turnFeedback",
-  "📖 MAIAR vai narrar sua ação; ⚙ OTA só será chamado se houver teste de regra."
- );
+ msg("turnFeedback","📖 MAIAR vai narrar sua ação; ⚙ OTA só será chamado se houver teste de regra.");
 
  try{
   const {data:authData,error:authError}=await db.auth.getSession();
-
   if(authError)throw authError;
-
   const token=authData.session?.access_token;
-
-  if(!token)
-   throw new Error("Sessão expirada. Entre novamente.");
+  if(!token)throw new Error("Sessão expirada. Entre novamente.");
 
   const response=await fetch(
    URL+"/functions/v1/submit-player-action",
@@ -664,9 +537,7 @@ async function send(payload){
      "apikey":KEY,
      "Authorization":"Bearer "+token
     },
-    body:JSON.stringify(
-     Object.assign({campaign_id:campaignId},payload)
-    )
+    body:JSON.stringify(Object.assign({campaign_id:campaignId},payload))
    }
   );
 
@@ -674,9 +545,7 @@ async function send(payload){
    const detail=await response.text();
    throw new Error("HTTP "+response.status+" "+detail.slice(0,350));
   }
-
-  if(!response.body)
-   throw new Error("O navegador não recebeu o fluxo de narração.");
+  if(!response.body)throw new Error("O navegador não recebeu o fluxo de narração.");
 
   const reader=response.body.getReader();
   const decoder=new TextDecoder();
@@ -686,47 +555,33 @@ async function send(payload){
    if(!live){
     live=document.createElement("article");
     live.className="story-turn story-live";
-
     const label=document.createElement("div");
     label.className="story-live-label";
     label.textContent="📖 MAIAR · narrando agora";
     live.appendChild(label);
-
     const content=document.createElement("div");
     content.className="story-narrator";
     content.id="eterLiveText";
     live.appendChild(content);
-
     log.querySelector(".story-empty")?.remove();
     log.appendChild(live);
    }
-
    $("eterLiveText").textContent=liveText;
    log.scrollTop=log.scrollHeight;
   };
 
   const process=line=>{
    if(!line.trim())return;
-
    let ev;
-   try{
-    ev=JSON.parse(line);
-   }catch{
-    return;
-   }
-
+   try{ev=JSON.parse(line)}catch{return;}
    if(ev.type==="stage"){
     msg("turnFeedback",ev.message||"Processando...");
-    if(ev.stage==="narrative"||ev.stage==="fallback")
-     showLive();
-
+    if(ev.stage==="narrative"||ev.stage==="fallback")showLive();
    }else if(ev.type==="text"){
     liveText+=ev.text||"";
     showLive();
-
    }else if(ev.type==="complete"){
     completed=ev.data;
-
    }else if(ev.type==="error"){
     throw new Error(ev.error||"Falha no processamento");
    }
@@ -735,32 +590,23 @@ async function send(payload){
   while(true){
    const part=await reader.read();
    if(part.done)break;
-
    buffer+=decoder.decode(part.value,{stream:true});
    const lines=buffer.split(/\r?\n/);
    buffer=lines.pop()||"";
-
-   for(const line of lines)
-    process(line);
+   for(const line of lines)process(line);
   }
-
   buffer+=decoder.decode();
-
-  if(buffer.trim())
-   process(buffer);
+  if(buffer.trim())process(buffer);
 
   if(!completed){
    throw new Error(
     "A transmissão terminou sem evento final. "+
-    (liveText
-     ?"A narração começou, mas não foi salva."
-     :"")
+    (liveText?"A narração começou, mas não foi salva.":"")
    );
   }
 
   const admin=completed.administrator||{};
   const e=admin.effects_applied||{};
-
   const result=admin.roll==null
    ?"Ação narrativa · sem teste"
    :"🎲 D20 "+admin.roll+
@@ -769,8 +615,7 @@ async function send(payload){
     " / CD "+admin.difficulty+
     " · "+(admin.success?"SUCESSO":"FALHA");
 
-  msg(
-   "turnFeedback",
+  msg("turnFeedback",
    result+
    " · XP "+(e.xp>=0?"+":"")+(e.xp||0)+
    " · HP "+(e.hp>=0?"+":"")+(e.hp||0)+
@@ -778,27 +623,21 @@ async function send(payload){
    " · Ouro "+(e.gold>=0?"+":"")+(e.gold||0)
   );
 
-  // Atualiza o histórico e os dados do personagem.
-  await loadCampaign(campaignId);
+  const actionLabel=payload.player_text||payload.display_text||payload.selected_option_key||"";
+  if(completed.narrative)renderTurn(completed.narrative,actionLabel);
+  await loadCampaign(campaignId,completed.narrative||null,actionLabel);
 
-  // Mostra qual provedor foi usado, quando informado pelo backend.
   const narrator=completed.providers?.narrator;
   if(narrator&&$("masterStatus")){
    $("masterStatus").textContent=
-    "MAIAR · "+
-    (narrator.provider==="groq_fallback"?"Groq (reserva)":narrator.provider)+
-    " · "+(narrator.model||"");
+    "MAIAR · "+narrator.provider+" · "+(narrator.model||"");
   }
 
-  if($("playerAction"))
-   $("playerAction").value="";
+  if($("playerAction"))$("playerAction").value="";
 
  }catch(e){
   msg("turnFeedback","Falha na interação: "+e.message,true);
-
-  if(live)
-   live.classList.remove("story-live");
-
+  if(live)live.classList.remove("story-live");
  }finally{
   busy=false;
   setPlay(!!campaignId);
@@ -814,12 +653,8 @@ function bind(){
 
  $("sendAction")?.addEventListener("click",()=>{
   const v=$("playerAction")?.value.trim();
-
   if(v){
-   send({
-    input_mode:"free_text",
-    player_text:v
-   });
+   send({input_mode:"free_text",player_text:v});
   }else{
    msg("turnFeedback","Descreva o que deseja fazer.",true);
   }
@@ -837,16 +672,12 @@ function bind(){
  );
 
  $("rollD20")?.addEventListener("click",()=>{
-  msg(
-   "turnFeedback",
-   "🎲 Rolagem livre D20: "+(1+Math.floor(Math.random()*20))
-  );
+  msg("turnFeedback","🎲 Rolagem livre D20: "+(1+Math.floor(Math.random()*20)));
  });
 }
 
 async function sdk(){
  if(window.supabase?.createClient)return;
-
  await new Promise((ok,no)=>{
   const s=document.createElement("script");
   s.src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js";
@@ -863,22 +694,16 @@ async function init(){
 
  try{
   await sdk();
-
-  db=window.supabase.createClient(
-   URL,
-   KEY,
-   {
-    auth:{
-     persistSession:true,
-     autoRefreshToken:true,
-     detectSessionInUrl:true
-    }
+  db=window.supabase.createClient(URL,KEY,{
+   auth:{
+    persistSession:true,
+    autoRefreshToken:true,
+    detectSessionInUrl:true
    }
-  );
+  });
 
   const r=await db.auth.getSession();
   if(r.error)throw r.error;
-
   session=r.data.session;
 
   bind();
@@ -887,15 +712,11 @@ async function init(){
   db.auth.onAuthStateChange((_e,s)=>{
    session=s;
    lockUI();
-
-   if(s)
-    Promise.resolve().then(listCampaigns);
+   if(s)Promise.resolve().then(listCampaigns);
   });
 
-  if(session)
-   await listCampaigns();
-  else
-   msg("eterAuthNotice","Entre para abrir sua jornada.");
+  if(session)await listCampaigns();
+  else msg("eterAuthNotice","Entre para abrir sua jornada.");
 
  }catch(e){
   msg("eterAuthNotice","Erro de conexão: "+e.message,true);
