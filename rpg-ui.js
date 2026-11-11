@@ -1,9 +1,5 @@
-
 /* ==========================================================
    CRÔNICAS DE ÉTER — PAINEL RPG INTEGRADO
-   Usa a mesma conexão Supabase de solo.js.
-   Não cria uma segunda sessão.
-   Não altera provedores de IA ou regras do banco.
    ========================================================== */
 
 (() => {
@@ -208,17 +204,31 @@
         gap:14px;
       }
 
+      .eru-entities-grid {
+        display:grid;
+        grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));
+        gap:12px;
+      }
+
+      .eru-entity-card {
+        min-width:0;
+        padding:12px;
+        border:1px solid #424b5d;
+        border-radius:10px;
+        background:#151c28;
+      }
+
       .eru-entity {
         display:grid;
-        grid-template-columns:85px minmax(0,1fr);
+        grid-template-columns:75px minmax(0,1fr);
         gap:12px;
       }
 
       .eru-portrait {
-        min-height:100px;
+        min-height:90px;
         display:grid;
         place-items:center;
-        font-size:48px;
+        font-size:42px;
         border:1px solid #81643e;
         border-radius:10px;
         background:radial-gradient(circle,#4a4051,#171b25);
@@ -267,12 +277,14 @@
         border-radius:8px;
         padding:8px 4px;
         text-align:center;
+        min-width:0;
       }
 
       .eru-entity-stat b {
         display:block;
         color:#f0d39a;
         font-size:13px;
+        overflow-wrap:anywhere;
       }
 
       .eru-entity-stat small {
@@ -405,12 +417,12 @@
         }
 
         .eru-entity {
-          grid-template-columns:70px minmax(0,1fr);
+          grid-template-columns:60px minmax(0,1fr);
         }
 
         .eru-portrait {
-          min-height:85px;
-          font-size:38px;
+          min-height:75px;
+          font-size:34px;
         }
 
         .eru-entity-stats {
@@ -641,106 +653,110 @@
       return;
     }
 
-    const entity =
-      alive.find(c => c.entity_type === "monster") || alive[0];
+    host.className = "eru-entities-grid";
 
-    const monster = (monsters || []).find(m =>
-      m.id === entity.entity_id
-    );
+    host.innerHTML = alive.map(entity => {
+      const monster = (monsters || []).find(m =>
+        m.id === entity.entity_id
+      );
 
-    const isNpc =
-      entity.entity_type === "npc" ||
-      encounter.encounter_type === "social";
+      const isNpc = entity.entity_type === "npc";
+      const stats = entity.stats || {};
+      const rarity = entity.rarity_key || monster?.rarity_key || "";
 
-    const stats = entity.stats || {};
-    const rarity = entity.rarity_key || monster?.rarity_key || "";
+      const description =
+        monster?.description ||
+        stats.description ||
+        encounter.narrative_context ||
+        "Uma presença foi registrada neste encontro.";
 
-    const description =
-      monster?.description ||
-      stats.description ||
-      encounter.narrative_context ||
-      "Uma presença foi registrada neste encontro.";
+      const hp = num(entity.hp_current);
+      const hpMax = Math.max(1,num(entity.hp_max,1));
+      const mana = num(entity.mana_current);
+      const manaMax = num(entity.mana_max);
 
-    const hp = num(entity.hp_current);
-    const hpMax = Math.max(1,num(entity.hp_max,1));
-    const mana = num(entity.mana_current);
-    const manaMax = num(entity.mana_max);
+      const attack = num(stats.attack ?? monster?.attack);
+      const defense = num(stats.defense ?? entity.armor ?? monster?.defense);
+      const xp = num(monster?.experience_reward ?? stats.experience_reward);
 
-    const attack = num(stats.attack ?? monster?.attack);
-    const defense = num(stats.defense ?? entity.armor ?? monster?.defense);
-    const xp = num(monster?.experience_reward ?? stats.experience_reward);
+      const role = stats.role || stats.profession ||
+        (isNpc ? "Personagem não jogável" :
+        monster?.monster_type || "Criatura");
 
-    const role = stats.role || stats.profession ||
-      (isNpc ? "Personagem não jogável" :
-      monster?.monster_type || "Criatura");
+      const personality = stats.personality || stats.temperament || "";
 
-    const personality = stats.personality || stats.temperament || "";
+      const name = entity.display_name ||
+        monster?.name ||
+        (isNpc ? "NPC desconhecido" : "Criatura desconhecida");
 
-    host.className = "";
+      const rarityLabel = rarity
+        ? rarity.replaceAll("_"," ")
+        : "Não definida";
 
-    host.innerHTML = `
-      <div class="eru-entity">
-        <div class="eru-portrait">${isNpc ? "🧝" : "👹"}</div>
-        <div>
-          <h4>
-            ${esc(entity.display_name || monster?.name ||
-              (isNpc ? "NPC desconhecido" : "Criatura desconhecida"))}
-          </h4>
+      return `
+        <article class="eru-entity-card">
+          <div class="eru-entity">
+            <div class="eru-portrait">${isNpc ? "🧝" : "👹"}</div>
+            <div>
+              <h4>${esc(name)}</h4>
 
-          <div class="eru-tags">
-            <span class="eru-tag">${isNpc ? "NPC" : "MONSTRO"}</span>
+              <div class="eru-tags">
+                <span class="eru-tag">${isNpc ? "NPC" : "MONSTRO"}</span>
 
-            ${rarity ? `
-              <span class="eru-tag"
-                style="color:${rarityColor(rarity)};border-color:${rarityColor(rarity)}">
-                ${esc(rarity.replaceAll("_"," "))}
-              </span>
-            ` : ""}
+                <span class="eru-tag"
+                  style="color:${rarityColor(rarity)};border-color:${rarityColor(rarity)}">
+                  ${esc(rarityLabel)}
+                </span>
 
-            ${entity.level ? `
-              <span class="eru-tag">Nível ${num(entity.level)}</span>
-            ` : ""}
+                ${entity.level ? `
+                  <span class="eru-tag">Nível ${num(entity.level)}</span>
+                ` : ""}
+              </div>
+
+              <div class="eru-description">${esc(description)}</div>
+
+              ${isNpc ? `
+                <div class="eru-meta">
+                  🎭 ${esc(role)}
+                  ${personality ? " · " + esc(personality) : ""}
+                </div>
+              ` : ""}
+            </div>
           </div>
 
-          <div class="eru-description">${esc(description)}</div>
+          <div class="eru-entity-stats">
+            <div class="eru-entity-stat">
+              <b>❤️ ${hp}/${hpMax}</b>
+              <small>VIDA</small>
+            </div>
+            <div class="eru-entity-stat">
+              <b>🔷 ${mana}/${manaMax}</b>
+              <small>MANA</small>
+            </div>
+            <div class="eru-entity-stat">
+              <b>⚔️ ${attack}</b>
+              <small>ATAQUE</small>
+            </div>
+            <div class="eru-entity-stat">
+              <b>🛡️ ${defense}</b>
+              <small>DEFESA</small>
+            </div>
+          </div>
 
-          ${isNpc ? `
+          ${!isNpc && xp ? `
             <div class="eru-meta">
-              🎭 ${esc(role)}
-              ${personality ? " · " + esc(personality) : ""}
+              ✨ Recompensa de experiência: ${xp} XP
             </div>
           ` : ""}
-        </div>
-      </div>
+        </article>
+      `;
+    }).join("");
 
-      <div class="eru-entity-stats">
-        <div class="eru-entity-stat">
-          <b>❤️ ${hp}/${hpMax}</b>
-          <small>VIDA</small>
-        </div>
-        <div class="eru-entity-stat">
-          <b>🔷 ${mana}/${manaMax}</b>
-          <small>MANA</small>
-        </div>
-        <div class="eru-entity-stat">
-          <b>⚔️ ${attack}</b>
-          <small>ATAQUE</small>
-        </div>
-        <div class="eru-entity-stat">
-          <b>🛡️ ${defense}</b>
-          <small>DEFESA</small>
-        </div>
-      </div>
-
-      ${!isNpc && xp ? `
-        <div class="eru-meta">
-          ✨ Recompensa de experiência: ${xp} XP
-        </div>
-      ` : ""}
-    `;
+    const npcCount = alive.filter(c => c.entity_type === "npc").length;
+    const monsterCount = alive.filter(c => c.entity_type === "monster").length;
 
     $("eruEncounterStatus").textContent =
-      isNpc ? "Interação social" : "Combate / ameaça";
+      `${monsterCount} monstro(s) · ${npcCount} NPC(s)`;
   }
 
   function itemIcon(item) {
@@ -976,12 +992,20 @@
 
     window.addEventListener("eter:supabase-ready",event => {
       connect(
-        event.detail?.client,
-        event.detail?.session
+        event.detail?.client || window.eterSupabaseClient,
+        event.detail?.session || null
       );
+
+      if (window.eterSupabaseClient) {
+        window.eterSupabaseClient.auth.getSession().then(result => {
+          connect(
+            window.eterSupabaseClient,
+            result.data?.session || null
+          );
+        });
+      }
     });
 
-    // Caso o solo.js já tenha iniciado antes deste arquivo.
     if (window.eterSupabaseClient) {
       window.eterSupabaseClient.auth.getSession().then(result => {
         connect(
@@ -996,7 +1020,6 @@
       loadDashboard();
     });
 
-    // Atualiza após uma nova cena ser adicionada à Jornada.
     const log = $("storyLog");
 
     if (log && window.MutationObserver) {
