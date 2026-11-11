@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Crônicas de Éter — Protótipo</title>
+<title>Crônicas de Éter — RPG Solo</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap');
 :root{--bg:#0b0c11;--panel:#141720;--panel2:#191e29;--line:#303747;--gold:#d5ad68;--gold2:#f0d39a;--muted:#929bad;--text:#e9e5dc;--red:#c85b5b;--blue:#68a9d7;--green:#7db58a;--purple:#a68ad8}
@@ -175,6 +175,7 @@ body{background:radial-gradient(ellipse at 15% 0%,#393149 0,transparent 34%),rad
   <button data-tab="craft"><span class="ico">⚒</span>Ofício & Craft</button>
   <button data-tab="story"><span class="ico">♧</span>História</button>
   <button data-tab="market"><span class="ico">♜</span>Mercado</button>
+  <button data-tab="solo"><span class="ico">✧</span>Mestre IA · Jornada</button>
  </nav>
  <div class="sidebarfoot">“O destino oferece caminhos.<br>As escolhas escrevem lendas.”<br><br><span style="color:var(--gold)">VERSÃO 0.3 · PROTÓTIPO EXPANSÍVEL</span></div>
 </aside>
@@ -410,7 +411,7 @@ function update(){
  $('equippedPreview').innerHTML=`<div class="skill"><div><h4>Arma principal</h4><p>${state.equipped.weapon||'Nenhuma'}</p></div><span>🪄</span></div><div class="skill"><div><h4>Armadura</h4><p>${state.equipped.armor||'Nenhuma'}</p></div><span>🛡️</span></div>`;
  renderItems();renderSkills();renderCraft();renderMarket();renderStory();
 }
-function switchTab(id){document.querySelectorAll('.tabview').forEach(x=>x.classList.toggle('active',x.id===id));document.querySelectorAll('.nav button').forEach(x=>x.classList.toggle('active',x.dataset.tab===id));let titles={overview:'Visão geral',character:'Personagem',forge3d:'Ateliê 3D',bestiary:'Bestiário',advanced:'Ficha avançada',inventory:'Inventário',skills:'Talentos & Magias',dice:'Mesa de dados',craft:'Ofício & Craft',story:'História',market:'Mercado',solo:'Mestre IA · Solo'};document.title=titles[id]+' · Crônicas de Éter';}
+function switchTab(id){document.querySelectorAll('.tabview').forEach(x=>x.classList.toggle('active',x.id===id));document.querySelectorAll('.nav button').forEach(x=>x.classList.toggle('active',x.dataset.tab===id));let titles={overview:'Visão geral',character:'Personagem',forge3d:'Ateliê 3D',bestiary:'Bestiário',advanced:'Ficha avançada',inventory:'Inventário',skills:'Talentos & Magias',dice:'Mesa de dados',craft:'Ofício & Craft',story:'História',market:'Mercado',solo:'Mestre IA · Jornada'};document.title=titles[id]+' · Crônicas de Éter';}
 document.getElementById('nav').addEventListener('click',e=>{let b=e.target.closest('button[data-tab]');if(b)switchTab(b.dataset.tab)});
 function toast(msg){let t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2300)}
 function adjustAttr(k,d){if(d>0&&state.points<=0)return;if(d<0&&state.attrs[k]<=3)return;state.attrs[k]+=d;state.points-=d;update()}
