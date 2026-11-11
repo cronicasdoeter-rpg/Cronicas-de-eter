@@ -1,15 +1,13 @@
 
 /* ==========================================================
-   CRÔNICAS DE ÉTER — INTERFACE VISUAL RPG
-   Arquivo: rpg-ui.js
-   Complemento independente de solo.js e dados.js
+   CRÔNICAS DE ÉTER — PAINEL RPG INTEGRADO
+   Usa a mesma conexão Supabase de solo.js.
+   Não cria uma segunda sessão.
+   Não altera provedores de IA ou regras do banco.
    ========================================================== */
 
 (() => {
   "use strict";
-
-  const SUPABASE_URL = "https://wwumjtorusjblitkzyjt.supabase.co";
-  const SUPABASE_KEY = "sb_publishable_5DS37kwbBFfhOir50K0QyA_54lvldUM";
 
   const $ = id => document.getElementById(id);
 
@@ -18,6 +16,7 @@
   let campaignId = null;
   let busy = false;
   let timer = null;
+  let observer = null;
 
   const esc = value => String(value ?? "").replace(/[&<>"']/g, c => ({
     "&": "&amp;",
@@ -27,17 +26,26 @@
     "'": "&#39;"
   })[c]);
 
-  const n = (value, fallback = 0) => {
-    const result = Number(value);
-    return Number.isFinite(result) ? result : fallback;
+  const num = (value, fallback = 0) => {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : fallback;
   };
 
-  const percent = (value, max) =>
+  const pct = (value, max) =>
     Math.max(0, Math.min(100, max > 0 ? value / max * 100 : 0));
 
-  /* =========================
-     ESTILOS
-  ========================= */
+  function rarityColor(value) {
+    const key = String(value || "").toLowerCase();
+
+    if (/deus|divin/.test(key)) return "#f3dca1";
+    if (/lend|legend/.test(key)) return "#d9a548";
+    if (/mist|abiss|caos/.test(key)) return "#bd78df";
+    if (/super/.test(key)) return "#a17be0";
+    if (/rar/.test(key)) return "#5ca5e5";
+    if (/incom/.test(key)) return "#67b67a";
+
+    return "#a7adb7";
+  }
 
   function styles() {
     if ($("eterRpgStyles")) return;
@@ -96,6 +104,7 @@
         color:#aeb8c8;
         font-size:11px;
         margin-top:5px;
+        line-height:1.6;
       }
 
       .eru-character {
@@ -103,6 +112,7 @@
         align-items:center;
         justify-content:space-between;
         gap:10px;
+        flex-wrap:wrap;
       }
 
       .eru-gold {
@@ -112,7 +122,6 @@
         padding:9px;
         color:#f0d18e;
         font-weight:bold;
-        white-space:nowrap;
       }
 
       .eru-bars {
@@ -355,6 +364,33 @@
         overflow-wrap:anywhere;
       }
 
+      .eru-location {
+        display:grid;
+        grid-template-columns:repeat(3,minmax(0,1fr));
+        gap:8px;
+      }
+
+      .eru-location-box {
+        background:#111722;
+        border:1px solid #424b5d;
+        border-radius:8px;
+        padding:11px;
+        min-width:0;
+      }
+
+      .eru-location-box small {
+        display:block;
+        color:#929bad;
+        font-size:9px;
+        margin-bottom:5px;
+      }
+
+      .eru-location-box b {
+        color:#edca87;
+        font-size:12px;
+        overflow-wrap:anywhere;
+      }
+
       @media(max-width:650px) {
         .eru-bars {
           grid-template-columns:1fr;
@@ -384,15 +420,15 @@
         .eru-items {
           grid-template-columns:repeat(2,minmax(0,1fr));
         }
+
+        .eru-location {
+          grid-template-columns:1fr;
+        }
       }
     `;
 
     document.head.appendChild(style);
   }
-
-  /* =========================
-     CRIAÇÃO DOS PAINÉIS
-  ========================= */
 
   function createDashboard() {
     if ($("eterRpgDashboard")) return;
@@ -404,10 +440,20 @@
       <section class="eru-panel">
         <div class="eru-heading">
           <h3>🧙 Ficha do aventureiro</h3>
-          <small id="eruSyncStatus">Aguardando...</small>
+          <small id="eruSyncStatus">Aguardando conexão...</small>
         </div>
         <div id="eruCharacterContent" class="eru-empty">
           Entre na sua conta e selecione uma campanha.
+        </div>
+      </section>
+
+      <section class="eru-panel">
+        <div class="eru-heading">
+          <h3>🗺️ Localização e mundo</h3>
+          <small>Estado da jornada</small>
+        </div>
+        <div id="eruWorldContent" class="eru-location">
+          <div class="eru-empty">Aguardando dados do mundo.</div>
         </div>
       </section>
 
@@ -456,28 +502,7 @@
     }
   }
 
-  /* =========================
-     RARIDADES
-  ========================= */
-
-  function rarityColor(value) {
-    const key = String(value || "").toLowerCase();
-
-    if (/divin|deus/.test(key)) return "#f3dca1";
-    if (/lend|legend/.test(key)) return "#d9a548";
-    if (/mitic|abiss|caos/.test(key)) return "#b17be0";
-    if (/super/.test(key)) return "#a17be0";
-    if (/rar/.test(key)) return "#5ca5e5";
-    if (/incom/.test(key)) return "#67b67a";
-
-    return "#a7adb7";
-  }
-
-  /* =========================
-     FICHA DO PERSONAGEM
-  ========================= */
-
-  function resourceBar(label, value, max, color) {
+  function renderBar(label,value,max,color) {
     return `
       <div class="eru-resource">
         <div class="eru-resource-top">
@@ -486,7 +511,7 @@
         </div>
         <div class="eru-track">
           <div class="eru-fill ${color}"
-            style="width:${percent(value,max)}%">
+            style="width:${pct(value,max)}%">
           </div>
         </div>
       </div>
@@ -494,41 +519,42 @@
   }
 
   function renderCharacter(character) {
+    const host = $("eruCharacterContent");
+
     if (!character) {
-      $("eruCharacterContent").className = "eru-empty";
-      $("eruCharacterContent").textContent =
-        "Nenhum personagem encontrado nesta campanha.";
+      host.className = "eru-empty";
+      host.textContent = "Nenhum personagem encontrado nesta campanha.";
       return;
     }
 
-    const resources = character.resources || {};
-    const attributes = character.attributes || {};
+    const r = character.resources || {};
+    const a = character.attributes || {};
 
-    const hp = n(resources.hp);
-    const hpMax = Math.max(1,n(resources.hp_max ?? resources.max_hp,30));
+    const hp = num(r.hp);
+    const hpMax = Math.max(1,num(r.hp_max ?? r.max_hp,30));
 
-    const mana = n(resources.mana);
-    const manaMax = Math.max(1,n(resources.mana_max ?? resources.max_mana,20));
+    const mana = num(r.mana);
+    const manaMax = Math.max(1,num(r.mana_max ?? r.max_mana,20));
 
-    const stamina = n(resources.stamina);
-    const staminaMax = Math.max(1,n(resources.stamina_max ?? resources.max_stamina,20));
+    const stamina = num(r.stamina);
+    const staminaMax = Math.max(1,num(r.stamina_max,20));
 
-    const xp = n(character.experience);
-    const level = Math.max(1,n(character.level,1));
+    const xp = num(character.experience);
+    const level = Math.max(1,num(character.level,1));
     const nextLevel = level * 500;
 
     const attrs = [
-      ["FOR",attributes.for ?? attributes.str ?? 10],
-      ["DES",attributes.des ?? attributes.dex ?? 10],
-      ["CON",attributes.con ?? 10],
-      ["INT",attributes.int ?? 10],
-      ["SAB",attributes.sab ?? attributes.wis ?? 10],
-      ["CAR",attributes.car ?? attributes.cha ?? 10]
+      ["FOR",a.for ?? a.str ?? 10],
+      ["DES",a.des ?? a.dex ?? 10],
+      ["CON",a.con ?? 10],
+      ["INT",a.int ?? 10],
+      ["SAB",a.sab ?? a.wis ?? 10],
+      ["CAR",a.car ?? a.cha ?? 10]
     ];
 
-    $("eruCharacterContent").className = "";
+    host.className = "";
 
-    $("eruCharacterContent").innerHTML = `
+    host.innerHTML = `
       <div class="eru-character">
         <div>
           <div class="eru-name">🧙 ${esc(character.name || "Aventureiro")}</div>
@@ -538,13 +564,13 @@
             · ${xp} XP
           </div>
         </div>
-        <div class="eru-gold">🪙 ${n(resources.gold)} ouro</div>
+        <div class="eru-gold">🪙 ${num(r.gold)} ouro</div>
       </div>
 
       <div class="eru-bars">
-        ${resourceBar("❤️ HP",hp,hpMax,"eru-hp")}
-        ${resourceBar("🔷 Mana",mana,manaMax,"eru-mana")}
-        ${resourceBar("⚡ Energia",stamina,staminaMax,"eru-stamina")}
+        ${renderBar("❤️ HP",hp,hpMax,"eru-hp")}
+        ${renderBar("🔷 Mana",mana,manaMax,"eru-mana")}
+        ${renderBar("⚡ Energia",stamina,staminaMax,"eru-stamina")}
       </div>
 
       <div class="eru-resource" style="margin-top:10px">
@@ -554,7 +580,7 @@
         </div>
         <div class="eru-track">
           <div class="eru-fill eru-xp"
-            style="width:${percent(xp,nextLevel)}%">
+            style="width:${pct(xp,nextLevel)}%">
           </div>
         </div>
       </div>
@@ -570,21 +596,47 @@
     `;
   }
 
-  /* =========================
-     MONSTROS E NPCS
-  ========================= */
+  function renderWorld(session,encounter) {
+    const host = $("eruWorldContent");
+    const world = session?.world_state || {};
 
-  function renderEntity(encounter, combatants, monsters) {
+    const region =
+      session?.current_region ||
+      encounter?.region ||
+      "Região desconhecida";
+
+    const chapter = world.chapter ?? "—";
+    const day = world.day ?? "—";
+    const time = world.time || world.period || "Não definido";
+
+    host.innerHTML = `
+      <div class="eru-location-box">
+        <small>📍 REGIÃO</small>
+        <b>${esc(region)}</b>
+      </div>
+      <div class="eru-location-box">
+        <small>📜 CAPÍTULO / DIA</small>
+        <b>${esc(chapter)} / ${esc(day)}</b>
+      </div>
+      <div class="eru-location-box">
+        <small>🕰️ HORÁRIO</small>
+        <b>${esc(time)}</b>
+      </div>
+    `;
+  }
+
+  function renderEntity(encounter,combatants,monsters) {
     const host = $("eruEntityContent");
 
     const alive = (combatants || []).filter(c =>
-      c.is_alive !== false && n(c.hp_current,1) > 0
+      c.entity_type !== "player" &&
+      c.is_alive !== false &&
+      num(c.hp_current,1) > 0
     );
 
     if (!encounter || !alive.length) {
       host.className = "eru-empty";
-      host.textContent =
-        "Nenhum monstro ou NPC ativo foi registrado nesta cena.";
+      host.textContent = "Nenhum monstro ou NPC ativo foi registrado nesta cena.";
       $("eruEncounterStatus").textContent = "Exploração";
       return;
     }
@@ -609,18 +661,18 @@
       encounter.narrative_context ||
       "Uma presença foi registrada neste encontro.";
 
-    const hp = n(entity.hp_current);
-    const hpMax = Math.max(1,n(entity.hp_max,1));
-    const mana = n(entity.mana_current);
-    const manaMax = n(entity.mana_max);
+    const hp = num(entity.hp_current);
+    const hpMax = Math.max(1,num(entity.hp_max,1));
+    const mana = num(entity.mana_current);
+    const manaMax = num(entity.mana_max);
 
-    const attack = n(stats.attack ?? monster?.attack);
-    const defense = n(stats.defense ?? entity.armor ?? monster?.defense);
-    const xp = n(monster?.experience_reward ?? stats.experience_reward);
+    const attack = num(stats.attack ?? monster?.attack);
+    const defense = num(stats.defense ?? entity.armor ?? monster?.defense);
+    const xp = num(monster?.experience_reward ?? stats.experience_reward);
 
-    const level = n(entity.level);
     const role = stats.role || stats.profession ||
-      (isNpc ? "Personagem não jogável" : monster?.monster_type || "Criatura");
+      (isNpc ? "Personagem não jogável" :
+      monster?.monster_type || "Criatura");
 
     const personality = stats.personality || stats.temperament || "";
 
@@ -629,7 +681,6 @@
     host.innerHTML = `
       <div class="eru-entity">
         <div class="eru-portrait">${isNpc ? "🧝" : "👹"}</div>
-
         <div>
           <h4>
             ${esc(entity.display_name || monster?.name ||
@@ -646,7 +697,9 @@
               </span>
             ` : ""}
 
-            ${level ? `<span class="eru-tag">Nível ${level}</span>` : ""}
+            ${entity.level ? `
+              <span class="eru-tag">Nível ${num(entity.level)}</span>
+            ` : ""}
           </div>
 
           <div class="eru-description">${esc(description)}</div>
@@ -665,17 +718,14 @@
           <b>❤️ ${hp}/${hpMax}</b>
           <small>VIDA</small>
         </div>
-
         <div class="eru-entity-stat">
           <b>🔷 ${mana}/${manaMax}</b>
           <small>MANA</small>
         </div>
-
         <div class="eru-entity-stat">
           <b>⚔️ ${attack}</b>
           <small>ATAQUE</small>
         </div>
-
         <div class="eru-entity-stat">
           <b>🛡️ ${defense}</b>
           <small>DEFESA</small>
@@ -692,10 +742,6 @@
     $("eruEncounterStatus").textContent =
       isNpc ? "Interação social" : "Combate / ameaça";
   }
-
-  /* =========================
-     INVENTÁRIO
-  ========================= */
 
   function itemIcon(item) {
     const data = item.item_data || {};
@@ -718,7 +764,7 @@
     const list = items || [];
 
     const count = list.reduce((sum,item) =>
-      sum + Math.max(1,n(item.quantity,1)),0
+      sum + Math.max(1,num(item.quantity,1)),0
     );
 
     $("eruInventoryCount").textContent =
@@ -741,15 +787,12 @@
       return `
         <article class="eru-item"
           style="--rarity:${rarityColor(rarity)}">
-
           <div class="eru-item-top">
             <span class="eru-item-icon">${esc(itemIcon(item))}</span>
-            <span>×${Math.max(1,n(item.quantity,1))}</span>
+            <span>×${Math.max(1,num(item.quantity,1))}</span>
           </div>
-
           <b>${esc(item.name || "Item sem nome")}</b>
           <p>${esc(description)}</p>
-
           <small>
             ${esc(rarity.replaceAll("_"," "))}
             ${item.element ? " · " + esc(item.element) : ""}
@@ -759,13 +802,8 @@
     }).join("");
   }
 
-  /* =========================
-     EQUIPAMENTOS
-  ========================= */
-
-  function renderEquipment(items, character) {
+  function renderEquipment(items,character) {
     const host = $("eruEquipmentContent");
-
     const resources = character?.resources || {};
     const equipped = resources.equipped || resources.equipment || {};
 
@@ -801,10 +839,6 @@
     }).join("");
   }
 
-  /* =========================
-     ATUALIZAÇÃO DO BANCO
-  ========================= */
-
   async function loadDashboard() {
     if (!db || !userId || !campaignId || busy) return;
 
@@ -829,36 +863,46 @@
         renderInventory([]);
         renderEquipment([],null);
         renderEntity(null,[],[]);
+        renderWorld(null,null);
         $("eruSyncStatus").textContent = "Ficha não encontrada";
         return;
       }
 
-      const [inventoryResult,encounterResult] = await Promise.all([
-        db.from("inventory_items")
-          .select("id,character_id,name,description,rarity,element,quantity,item_data,created_at")
-          .eq("character_id",character.id)
-          .eq("user_id",userId)
-          .order("created_at",{ascending:false}),
+      const [inventoryResult,encounterResult,sessionResult] =
+        await Promise.all([
+          db.from("inventory_items")
+            .select("id,character_id,name,description,rarity,element,quantity,item_data,created_at")
+            .eq("character_id",character.id)
+            .eq("user_id",userId)
+            .order("created_at",{ascending:false}),
 
-        db.from("encounters")
-          .select("id,campaign_id,user_id,encounter_type,narrative_context,status,created_at")
-          .eq("campaign_id",campaignId)
-          .eq("user_id",userId)
-          .eq("status","active")
-          .order("created_at",{ascending:false})
-          .limit(1)
-          .maybeSingle()
-      ]);
+          db.from("encounters")
+            .select("id,campaign_id,user_id,region,encounter_type,narrative_context,status,round_number,created_at")
+            .eq("campaign_id",campaignId)
+            .eq("user_id",userId)
+            .eq("status","active")
+            .order("created_at",{ascending:false})
+            .limit(1)
+            .maybeSingle(),
+
+          db.from("game_sessions")
+            .select("status,current_region,world_state")
+            .eq("campaign_id",campaignId)
+            .eq("user_id",userId)
+            .maybeSingle()
+        ]);
 
       if (inventoryResult.error) throw inventoryResult.error;
       if (encounterResult.error) throw encounterResult.error;
+      if (sessionResult.error) throw sessionResult.error;
 
       const items = inventoryResult.data || [];
+      const encounter = encounterResult.data;
+      const gameSession = sessionResult.data;
 
       renderInventory(items);
       renderEquipment(items,character);
-
-      const encounter = encounterResult.data;
+      renderWorld(gameSession,encounter);
 
       if (!encounter) {
         renderEntity(null,[],[]);
@@ -893,10 +937,11 @@
         renderEntity(encounter,combatants,monsters);
       }
 
-      $("eruSyncStatus").textContent = "Atualizado";
+      $("eruSyncStatus").textContent =
+        "Atualizado · " + new Date().toLocaleTimeString("pt-BR");
+
     } catch (error) {
       console.error("[Crônicas de Éter]",error);
-
       $("eruSyncStatus").textContent = "Falha ao atualizar";
       $("eruSyncStatus").title = error?.message || String(error);
     } finally {
@@ -904,108 +949,91 @@
     }
   }
 
-  /* =========================
-     INICIALIZAÇÃO SUPABASE
-  ========================= */
+  function connect(client,session) {
+    if (!client) return;
 
-  async function loadSupabaseSdk() {
-    if (window.supabase?.createClient) return;
+    db = client;
+    userId = session?.user?.id || null;
+    campaignId = $("campaignSelect")?.value || null;
 
-    await new Promise((resolve,reject) => {
-      const script = document.createElement("script");
+    if (userId && campaignId) {
+      loadDashboard();
+    } else {
+      renderCharacter(null);
+      renderInventory([]);
+      renderEquipment([],null);
+      renderEntity(null,[],[]);
+      renderWorld(null,null);
 
-      script.src =
-        "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js";
-
-      script.onload = resolve;
-      script.onerror = () =>
-        reject(new Error("Não foi possível carregar o cliente Supabase."));
-
-      document.head.appendChild(script);
-    });
+      $("eruSyncStatus").textContent =
+        userId ? "Selecione uma campanha" : "Faça login";
+    }
   }
 
-  async function init() {
+  function init() {
     styles();
     createDashboard();
 
-    try {
-      await loadSupabaseSdk();
-
-      db = window.supabase.createClient(
-        SUPABASE_URL,
-        SUPABASE_KEY,
-        {
-          auth: {
-            persistSession:true,
-            autoRefreshToken:true,
-            detectSessionInUrl:true
-          }
-        }
+    window.addEventListener("eter:supabase-ready",event => {
+      connect(
+        event.detail?.client,
+        event.detail?.session
       );
+    });
 
-      const sessionResult = await db.auth.getSession();
-
-      if (sessionResult.error) throw sessionResult.error;
-
-      userId = sessionResult.data.session?.user?.id || null;
-
-      const campaignSelect = $("campaignSelect");
-
-      function syncCampaign() {
-        campaignId = campaignSelect?.value || null;
-
-        if (campaignId && userId) {
-          loadDashboard();
-        } else {
-          renderCharacter(null);
-          renderInventory([]);
-          renderEquipment([],null);
-          renderEntity(null,[],[]);
-          $("eruSyncStatus").textContent =
-            userId ? "Selecione uma campanha" : "Faça login";
-        }
-      }
-
-      campaignSelect?.addEventListener("change",syncCampaign);
-
-      db.auth.onAuthStateChange((_event,session) => {
-        userId = session?.user?.id || null;
-        campaignId = campaignSelect?.value || null;
-
-        if (userId && campaignId) loadDashboard();
+    // Caso o solo.js já tenha iniciado antes deste arquivo.
+    if (window.eterSupabaseClient) {
+      window.eterSupabaseClient.auth.getSession().then(result => {
+        connect(
+          window.eterSupabaseClient,
+          result.data?.session || null
+        );
       });
-
-      if (campaignSelect?.value) {
-        syncCampaign();
-      } else {
-        $("eruSyncStatus").textContent =
-          userId ? "Selecione uma campanha" : "Faça login";
-      }
-
-      if (timer) clearInterval(timer);
-
-      timer = setInterval(() => {
-        if (document.visibilityState !== "visible") return;
-
-        const selected = $("campaignSelect")?.value || null;
-
-        if (selected !== campaignId) campaignId = selected;
-
-        if (campaignId && userId) loadDashboard();
-      },7000);
-
-      document.addEventListener("visibilitychange",() => {
-        if (document.visibilityState === "visible") {
-          loadDashboard();
-        }
-      });
-
-    } catch (error) {
-      console.error("[Crônicas de Éter]",error);
-      $("eruSyncStatus").textContent = "Erro de conexão";
-      $("eruSyncStatus").title = error?.message || String(error);
     }
+
+    $("campaignSelect")?.addEventListener("change",event => {
+      campaignId = event.target.value || null;
+      loadDashboard();
+    });
+
+    // Atualiza após uma nova cena ser adicionada à Jornada.
+    const log = $("storyLog");
+
+    if (log && window.MutationObserver) {
+      observer = new MutationObserver(() => {
+        if (db && userId && campaignId) {
+          clearTimeout(observer.refreshTimer);
+          observer.refreshTimer = setTimeout(loadDashboard,900);
+        }
+      });
+
+      observer.observe(log,{
+        childList:true,
+        subtree:true
+      });
+    }
+
+    if (timer) clearInterval(timer);
+
+    timer = setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+
+      const selected = $("campaignSelect")?.value || null;
+
+      if (selected !== campaignId) {
+        campaignId = selected;
+      }
+
+      if (db && userId && campaignId) {
+        loadDashboard();
+      }
+    },7000);
+
+    document.addEventListener("visibilitychange",() => {
+      if (document.visibilityState === "visible") {
+        loadDashboard();
+      }
+    });
   }
 
   if (document.readyState === "loading") {
