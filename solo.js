@@ -1,706 +1,303 @@
 
 (() => {
-  "use strict";
-
-  const SUPABASE_URL = "https://wwumjtorusjblitkzyjt.supabase.co";
-  const SUPABASE_KEY = "sb_publishable_5DS37kwbBFfhOir50K0QyA_54lvldUM";
-
-  let supabaseClient = null;
-  let currentSession = null;
-  let activeCampaignId = null;
-  let busy = false;
-
-  const $ = (id) => document.getElementById(id);
-
-  function addStyles() {
-    if ($("eterAuthStyles")) return;
-
-    const style = document.createElement("style");
-    style.id = "eterAuthStyles";
-    style.textContent = `
-      body.eter-locked .shell,
-      body.eter-locked #app,
-      body.eter-locked main,
-      body.eter-locked .app,
-      body.eter-locked .container {
-        visibility: hidden !important;
-        pointer-events: none !important;
-      }
-
-      #eterAuthLayer {
-        position: fixed;
-        inset: 0;
-        z-index: 2147483000;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 18px;
-        background: radial-gradient(ellipse at top,#29364b,#10141e 60%,#080a10);
-        color: #eee8dc;
-        font-family: Inter,system-ui,sans-serif;
-      }
-
-      #eterAuthLayer[hidden],
-      #eterSettings[hidden] {
-        display: none !important;
-      }
-
-      .eter-auth-box,
-      .eter-settings-box {
-        width: min(100%,440px);
-        max-height: 94vh;
-        overflow: auto;
-        background: #151a25;
-        border: 1px solid #80683f;
-        border-radius: 16px;
-        padding: 23px;
-        box-shadow: 0 25px 90px #000b;
-      }
-
-      .eter-auth-logo {
-        color: #e6c68d;
-        letter-spacing: .16em;
-        font-size: 11px;
-        font-weight: 800;
-      }
-
-      .eter-auth-box h1,
-      .eter-settings-box h2 {
-        font-family: Georgia,serif;
-        color: #f0d39a;
-      }
-
-      .eter-auth-box h1 {
-        font-size: 26px;
-        margin: 12px 0;
-      }
-
-      .eter-auth-box p {
-        color: #aeb7c7;
-        font-size: 13px;
-        line-height: 1.65;
-      }
-
-      .eter-auth-label {
-        display: block;
-        color: #d8c39d;
-        font-size: 12px;
-        margin: 13px 0 5px;
-      }
-
-      .eter-auth-input {
-        display: block;
-        width: 100%;
-        box-sizing: border-box;
-        background: #0c111b;
-        border: 1px solid #465064;
-        color: white;
-        border-radius: 8px;
-        padding: 13px;
-        font: inherit;
-      }
-
-      .eter-auth-actions {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 9px;
-        margin-top: 15px;
-      }
-
-      .eter-auth-btn {
-        flex: 1;
-        min-width: 120px;
-        padding: 12px;
-        border-radius: 8px;
-        border: 1px solid #d2ae70;
-        background: linear-gradient(135deg,#b58b4c,#80602e);
-        color: #160f08;
-        font-weight: 800;
-        cursor: pointer;
-      }
-
-      .eter-auth-btn.alt {
-        background: #222a38;
-        color: #eee4d1;
-        border-color: #59647a;
-      }
-
-      .eter-auth-btn:disabled {
-        opacity: .5;
-        cursor: wait;
-      }
-
-      #eterAuthNotice,
-      #eterSettingsNotice {
-        min-height: 24px;
-        margin-top: 12px;
-        color: #b8d8a8;
-        font-size: 12px;
-        line-height: 1.5;
-        overflow-wrap: anywhere;
-      }
-
-      .eter-auth-error {
-        color: #ffaaa0 !important;
-      }
-
-      #eterSettingsButton {
-        position: relative;
-        z-index: 1000;
-        border: 1px solid #b58b4c;
-        border-radius: 8px;
-        padding: 9px 12px;
-        background: #1b2230;
-        color: #f0d39a;
-        font-weight: 800;
-        cursor: pointer;
-        margin: 5px;
-      }
-
-      #eterSettings {
-        position: fixed;
-        inset: 0;
-        z-index: 2147482000;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 18px;
-        background: #05070bdd;
-      }
-
-      .eter-settings-user {
-        color: #a9c99e;
-        font-size: 12px;
-        overflow-wrap: anywhere;
-        margin: 10px 0;
-      }
-
-      @media(max-width:560px) {
-        .eter-auth-box { padding: 19px; }
-        .eter-auth-box h1 { font-size: 23px; }
-      }
-    `;
-
-    document.head.appendChild(style);
-  }
-
-  function buildAuthUI() {
-    if (!$("eterAuthLayer")) {
-      const layer = document.createElement("div");
-      layer.id = "eterAuthLayer";
-
-      layer.innerHTML = `
-        <section class="eter-auth-box" role="dialog" aria-modal="true">
-          <div class="eter-auth-logo">CRÔNICAS DE ÉTER · ACESSO</div>
-          <h1>Entre para iniciar sua jornada</h1>
-          <p>
-            O jogo ficará bloqueado até você entrar na sua conta.
-            Crie uma conta gratuita ou entre com seus dados.
-          </p>
-
-          <label class="eter-auth-label" for="eterAuthEmail">E-mail</label>
-          <input class="eter-auth-input" id="eterAuthEmail"
-            type="email" autocomplete="username"
-            placeholder="voce@email.com">
-
-          <label class="eter-auth-label" for="eterAuthPassword">Senha</label>
-          <input class="eter-auth-input" id="eterAuthPassword"
-            type="password" autocomplete="current-password"
-            placeholder="Sua senha">
-
-          <div class="eter-auth-actions">
-            <button class="eter-auth-btn" id="eterDoLogin">ENTRAR</button>
-            <button class="eter-auth-btn alt" id="eterDoRegister">CRIAR CONTA</button>
-          </div>
-
-          <div id="eterAuthNotice" role="status"></div>
-        </section>
-      `;
-
-      document.body.appendChild(layer);
-    }
-
-    if (!$("eterSettings")) {
-      const settings = document.createElement("div");
-      settings.id = "eterSettings";
-      settings.hidden = true;
-
-      settings.innerHTML = `
-        <section class="eter-settings-box" role="dialog" aria-modal="true">
-          <h2>Configurações da conta</h2>
-
-          <div id="eterSettingsUser" class="eter-settings-user">
-            Verificando conta...
-          </div>
-
-          <div id="eterSettingsLoggedOut">
-            <label class="eter-auth-label">E-mail</label>
-            <input class="eter-auth-input" id="eterSettingsEmail"
-              type="email" autocomplete="username">
-
-            <label class="eter-auth-label">Senha</label>
-            <input class="eter-auth-input" id="eterSettingsPassword"
-              type="password" autocomplete="current-password">
-
-            <div class="eter-auth-actions">
-              <button class="eter-auth-btn" id="eterSettingsLogin">ENTRAR</button>
-              <button class="eter-auth-btn alt" id="eterSettingsRegister">CRIAR CONTA</button>
-            </div>
-          </div>
-
-          <div id="eterSettingsLoggedIn" hidden>
-            <div class="eter-auth-actions">
-              <button class="eter-auth-btn alt" id="eterDoLogout">SAIR DA CONTA</button>
-            </div>
-          </div>
-
-          <div id="eterSettingsNotice" role="status"></div>
-
-          <div class="eter-auth-actions">
-            <button class="eter-auth-btn alt" id="eterSettingsClose">FECHAR</button>
-          </div>
-        </section>
-      `;
-
-      document.body.appendChild(settings);
-    }
-
-    if (!$("eterSettingsButton")) {
-      const button = document.createElement("button");
-      button.id = "eterSettingsButton";
-      button.type = "button";
-      button.textContent = "⚙ Configurações";
-
-      const top = document.querySelector(".topright")
-        || document.querySelector("header")
-        || document.body;
-
-      top.appendChild(button);
-    }
-
-    $("eterDoLogin").onclick = () =>
-      authenticate("login", "eterAuthEmail", "eterAuthPassword", "eterAuthNotice");
-
-    $("eterDoRegister").onclick = () =>
-      authenticate("register", "eterAuthEmail", "eterAuthPassword", "eterAuthNotice");
-
-    $("eterSettingsLogin").onclick = () =>
-      authenticate("login", "eterSettingsEmail", "eterSettingsPassword", "eterSettingsNotice");
-
-    $("eterSettingsRegister").onclick = () =>
-      authenticate("register", "eterSettingsEmail", "eterSettingsPassword", "eterSettingsNotice");
-
-    $("eterDoLogout").onclick = logout;
-
-    $("eterSettingsButton").onclick = () => {
-      $("eterSettings").hidden = false;
-    };
-
-    $("eterSettingsClose").onclick = () => {
-      $("eterSettings").hidden = true;
-    };
-
-    $("eterSettings").onclick = (event) => {
-      if (event.target.id === "eterSettings") {
-        $("eterSettings").hidden = true;
-      }
-    };
-  }
-
-  function notice(id, text, error = false) {
-    const node = $(id);
-    if (!node) return;
-
-    node.textContent = text || "";
-    node.classList.toggle("eter-auth-error", error);
-  }
-
-  function updateAuthUI() {
-    const logged = !!currentSession?.user;
-
-    document.body.classList.toggle("eter-locked", !logged);
-
-    $("eterAuthLayer").hidden = logged;
-    $("eterSettingsLoggedOut").hidden = logged;
-    $("eterSettingsLoggedIn").hidden = !logged;
-
-    $("eterSettingsUser").textContent = logged
-      ? "Conectado como: " + (currentSession.user.email || currentSession.user.id)
-      : "Nenhuma conta conectada.";
-
-    $("eterSettingsButton").textContent = logged
-      ? "⚙ Configurações · conectado"
-      : "⚙ Entrar";
-
-    if (!logged) {
-      activeCampaignId = null;
-    }
-  }
-
-  async function authenticate(mode, emailId, passwordId, noticeId) {
-    const email = $(emailId).value.trim();
-    const password = $(passwordId).value;
-
-    if (!email || !password) {
-      notice(noticeId, "Informe seu e-mail e senha.", true);
-      return;
-    }
-
-    if (mode === "register" && password.length < 6) {
-      notice(noticeId, "A senha precisa ter pelo menos 6 caracteres.", true);
-      return;
-    }
-
-    notice(noticeId, mode === "login" ? "Entrando..." : "Criando conta...");
-
-    try {
-      const result = mode === "login"
-        ? await supabaseClient.auth.signInWithPassword({ email, password })
-        : await supabaseClient.auth.signUp({ email, password });
-
-      if (result.error) throw result.error;
-
-      if (result.data.session) {
-        currentSession = result.data.session;
-        updateAuthUI();
-        notice(noticeId, "Acesso realizado com sucesso.");
-        await refreshCampaigns();
-      } else {
-        notice(
-          noticeId,
-          "Conta criada. Se a confirmação de e-mail estiver ativada, confirme seu endereço e depois entre."
-        );
-      }
-    } catch (error) {
-      notice(noticeId, error.message || "Erro de autenticação.", true);
-    }
-  }
-
-  async function logout() {
-    notice("eterSettingsNotice", "Encerrando sessão...");
-
-    const { error } = await supabaseClient.auth.signOut();
-
-    if (error) {
-      notice("eterSettingsNotice", error.message, true);
-      return;
-    }
-
-    currentSession = null;
-    updateAuthUI();
-
-    $("eterSettings").hidden = true;
-    notice("eterAuthNotice", "Você saiu da conta. Entre novamente para acessar o jogo.");
-  }
-
-  function loadSDK() {
-    if (window.supabase?.createClient) return Promise.resolve();
-
-    return new Promise((resolve, reject) => {
-      const script = document.createElement("script");
-
-      script.src =
-        "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js";
-
-      script.onload = resolve;
-      script.onerror = () => reject(
-        new Error("Não foi possível carregar o Supabase.")
-      );
-
-      document.head.appendChild(script);
-    });
-  }
-
-  async function refreshCampaigns() {
-    if (!currentSession) return;
-
-    const select = $("campaignSelect");
-    if (!select) return;
-
-    const { data, error } = await supabaseClient
-      .from("campaigns")
-      .select("id,title")
-      .eq("user_id", currentSession.user.id)
-      .order("updated_at", { ascending: false });
-
-    if (error) {
-      notice("eterSettingsNotice", error.message, true);
-      return;
-    }
-
-    select.innerHTML = '<option value="">Selecione uma campanha</option>';
-
-    (data || []).forEach((campaign) => {
-      const option = document.createElement("option");
-      option.value = campaign.id;
-      option.textContent = campaign.title;
-      select.appendChild(option);
-    });
-  }
-
-  async function loadCampaign(id) {
-    if (!currentSession) return;
-
-    const { data: campaign, error } = await supabaseClient
-      .from("campaigns")
-      .select("id,title")
-      .eq("id", id)
-      .eq("user_id", currentSession.user.id)
-      .single();
-
-    if (error) {
-      setFeedback(error.message, true);
-      return;
-    }
-
-    activeCampaignId = campaign.id;
-
-    const { data: turns, error: turnError } = await supabaseClient
-      .from("narrative_turns")
-      .select("turn_number,scene_text,options")
-      .eq("campaign_id", id)
-      .eq("user_id", currentSession.user.id)
-      .order("turn_number", { ascending: true });
-
-    if (turnError) {
-      setFeedback(turnError.message, true);
-      return;
-    }
-
-    $("storyLog").innerHTML = "";
-
-    (turns || []).forEach(renderNarrative);
-
-    setFeedback("Campanha carregada: " + campaign.title);
-  }
-
-  function setFeedback(text, error = false) {
-    const node = $("turnFeedback");
-    if (!node) return;
-
-    node.textContent = text;
-    node.style.color = error ? "#ff9c8e" : "";
-  }
-
-  function renderNarrative(turn) {
-    const log = $("storyLog");
-    if (!log || !turn) return;
-
-    const entry = document.createElement("div");
-    entry.style.cssText =
-      "padding:12px 0;border-bottom:1px solid #303747;white-space:pre-wrap;line-height:1.7";
-
-    entry.textContent = turn.scene_text || "";
-    log.appendChild(entry);
-
-    const choices = $("suggestedChoices");
-    if (!choices) return;
-
-    choices.innerHTML = "";
-
-    (turn.options || []).forEach((option) => {
-      const button = document.createElement("button");
-
-      button.className = "btn ghost";
-      button.textContent = `${option.key || ""} · ${option.text || ""}`;
-
-      button.onclick = () => submitAction({
-        input_mode: "choice",
-        selected_option_key: option.key
-      });
-
-      choices.appendChild(button);
-    });
-  }
-
-  async function createCampaign() {
-    if (!currentSession) {
-      $("eterSettings").hidden = false;
-      notice("eterSettingsNotice", "Entre na sua conta para criar uma campanha.", true);
-      return;
-    }
-
-    if (busy) return;
-
-    const title = $("campaignTitle")?.value.trim() || "Uma nova lenda";
-    const premise = $("campaignPremise")?.value.trim() || "Uma aventura medieval de fantasia.";
-    const story = $("campaignStory")?.value.trim() || "";
-    const world = $("campaignWorld")?.value.trim() || "";
-    const rules = $("campaignRules")?.value.trim() || "";
-
-    busy = true;
-    setFeedback("Criando campanha...");
-
-    try {
-      const { data: campaign, error } = await supabaseClient
-        .from("campaigns")
-        .insert({
-          user_id: currentSession.user.id,
-          title,
-          premise,
-          world_canon: [world, story].filter(Boolean).join("\n\n"),
-          house_rules: rules || "OTA administra regras e resultados. MAIAR narra o mundo."
-        })
-        .select("id,title")
-        .single();
-
-      if (error) throw error;
-
-      const { error: sessionError } = await supabaseClient
-        .from("game_sessions")
-        .insert({
-          campaign_id: campaign.id,
-          user_id: currentSession.user.id,
-          status: "active",
-          current_region: "Ponto de partida",
-          world_state: { chapter: 1, day: 1 }
-        });
-
-      if (sessionError) throw sessionError;
-
-      activeCampaignId = campaign.id;
-
-      await refreshCampaigns();
-
-      if ($("campaignSelect")) {
-        $("campaignSelect").value = campaign.id;
-      }
-
-      $("storyLog").innerHTML = "";
-
-      await submitAction({
-        input_mode: "free_text",
-        player_text: "Comece a aventura. Apresente o mundo, o local inicial e uma situação envolvente."
-      });
-
-    } catch (error) {
-      setFeedback("Erro ao criar campanha: " + error.message, true);
-    } finally {
-      busy = false;
-    }
-  }
-
-  async function submitAction(payload) {
-    if (!currentSession || !activeCampaignId || busy) return;
-
-    busy = true;
-    setFeedback("OTA está validando sua ação. Maiar está narrando...");
-
-    try {
-      const { data, error } = await supabaseClient.functions.invoke(
-        "submit-player-action",
-        {
-          body: {
-            campaign_id: activeCampaignId,
-            ...payload
-          }
-        }
-      );
-
-      if (error) throw error;
-      if (data?.error) throw new Error(data.detail || data.error);
-
-      if (data?.narrative) {
-        renderNarrative(data.narrative);
-      }
-
-      const admin = data?.administrator;
-
-      if (admin?.roll != null) {
-        setFeedback(
-          `D20: ${admin.roll} · Modificador: ${admin.modifier} · Total: ${admin.total} · ${admin.success ? "SUCESSO" : "FALHA"}`
-        );
-      } else {
-        setFeedback("Turno concluído.");
-      }
-
-      if ($("playerAction")) $("playerAction").value = "";
-
-    } catch (error) {
-      setFeedback("Erro ao enviar ação: " + error.message, true);
-    } finally {
-      busy = false;
-    }
-  }
-
-  function bindGame() {
-    $("createCampaign")?.addEventListener("click", createCampaign);
-
-    $("sendAction")?.addEventListener("click", () => {
-      const text = $("playerAction")?.value.trim();
-
-      if (!text) {
-        setFeedback("Escreva sua ação primeiro.", true);
-        return;
-      }
-
-      submitAction({
-        input_mode: "free_text",
-        player_text: text
-      });
-    });
-
-    $("campaignSelect")?.addEventListener("change", (event) => {
-      if (event.target.value) loadCampaign(event.target.value);
-    });
-  }
-
-  async function initialize() {
-    addStyles();
-
-    // Bloqueia imediatamente, antes de verificar a sessão.
-    document.body.classList.add("eter-locked");
-
-    buildAuthUI();
-
-    try {
-      await loadSDK();
-
-      supabaseClient = window.supabase.createClient(
-        SUPABASE_URL,
-        SUPABASE_KEY,
-        {
-          auth: {
-            persistSession: true,
-            autoRefreshToken: true,
-            detectSessionInUrl: true
-          }
-        }
-      );
-
-      const { data, error } = await supabaseClient.auth.getSession();
-
-      if (error) throw error;
-
-      currentSession = data.session;
-
-      updateAuthUI();
-      bindGame();
-
-      supabaseClient.auth.onAuthStateChange((_event, session) => {
-        currentSession = session;
-        updateAuthUI();
-
-        if (session) {
-          Promise.resolve().then(refreshCampaigns);
-        }
-      });
-
-      if (currentSession) {
-        await refreshCampaigns();
-      } else {
-        notice("eterAuthNotice", "Faça login para desbloquear o site.");
-      }
-
-    } catch (error) {
-      notice("eterAuthNotice", "Erro de conexão: " + error.message, true);
-    }
-  }
-
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", initialize, { once: true });
-  } else {
-    initialize();
-  }
-
+"use strict";
+const URL="https://wwumjtorusjblitkzyjt.supabase.co";
+const KEY="sb_publishable_5DS37kwbBFfhOir50K0QyA_54lvldUM";
+let db=null,session=null,campaignId=null,busy=false;
+const $=id=>document.getElementById(id);
+const msg=(id,t,bad)=>{const e=$(id);if(e){e.textContent=t;e.style.color=bad?"#ff9c8e":""}};
+
+function styles(){
+ if($("eterSoloStyles"))return;
+ const s=document.createElement("style");s.id="eterSoloStyles";
+ s.textContent='body.eter-locked .shell{visibility:hidden!important;pointer-events:none!important}'+
+ '#eterAuthLayer{position:fixed;inset:0;z-index:2147483000;display:grid;place-items:center;padding:18px;background:radial-gradient(ellipse at top,#29364b,#10141e 65%,#080a10);color:#eee8dc;font-family:Inter,system-ui}'+
+ '#eterAuthLayer[hidden],#eterSettings[hidden]{display:none!important}.eter-box{width:min(100%,440px);max-height:94vh;overflow:auto;background:#151a25;border:1px solid #80683f;border-radius:16px;padding:23px;box-shadow:0 25px 90px #000b}'+
+ '.eter-box h2{font-family:Cinzel,Georgia,serif;color:#f0d39a}.eter-box p{color:#aeb7c7;font-size:13px;line-height:1.6}.eter-label{display:block;color:#d8c39d;font-size:12px;margin:13px 0 5px}'+
+ '.eter-input{display:block;width:100%;box-sizing:border-box;background:#0c111b;border:1px solid #465064;color:white;border-radius:8px;padding:13px;font:inherit}.eter-actions{display:flex;flex-wrap:wrap;gap:9px;margin-top:14px}'+
+ '.eter-btn{flex:1;min-width:120px;padding:11px;border-radius:8px;border:1px solid #d2ae70;background:linear-gradient(135deg,#b58b4c,#80602e);color:#160f08;font-weight:800;cursor:pointer}.eter-btn.alt{background:#222a38;color:#eee4d1;border-color:#59647a}'+
+ '#eterAuthNotice,#eterSettingsNotice{min-height:24px;margin-top:12px;font-size:12px;overflow-wrap:anywhere}#eterSettings{position:fixed;inset:0;z-index:2147482000;display:grid;place-items:center;padding:18px;background:#05070bdd}'+
+ '#eterSettingsButton{border:1px solid #b58b4c;border-radius:8px;padding:8px 11px;background:#1b2230;color:#f0d39a;font-weight:800;cursor:pointer}#solo .solo-tools{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}'+
+ '#solo .solo-tools button{flex:1;min-width:120px}#solo .story-turn{white-space:pre-wrap;line-height:1.75;padding:15px 0;border-bottom:1px solid #303747;color:#e8e1d4}#solo .story-turn small{display:block;color:#d3ad70;font-size:10px;letter-spacing:1px;margin-bottom:7px}'+
+ '#solo .suggested-choices{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}#solo .suggested-choices button{white-space:normal;text-align:left}#solo .solo-setup input,#solo .solo-setup textarea,#solo .solo-setup select{width:100%;margin:5px 0 12px}@media(max-width:600px){#solo .composer{flex-direction:column}}';
+ document.head.appendChild(s);
+}
+
+function authUI(){
+ if(!$("eterAuthLayer")){
+  const e=document.createElement("div");e.id="eterAuthLayer";
+  e.innerHTML='<section class="eter-box"><div style="font-size:11px;letter-spacing:3px;color:#e6c68d">CRÔNICAS DE ÉTER</div><h2>Entre para iniciar sua jornada</h2><p>Faça login ou crie sua conta. A aventura só será liberada após a autenticação.</p><label class="eter-label">E-mail</label><input class="eter-input" id="eterEmail" type="email" autocomplete="username"><label class="eter-label">Senha</label><input class="eter-input" id="eterPassword" type="password" autocomplete="current-password"><div class="eter-actions"><button class="eter-btn" id="eterLogin">ENTRAR</button><button class="eter-btn alt" id="eterRegister">CRIAR CONTA</button></div><div id="eterAuthNotice"></div></section>';
+  document.body.appendChild(e);
+ }
+ if(!$("eterSettings")){
+  const e=document.createElement("div");e.id="eterSettings";e.hidden=true;
+  e.innerHTML='<section class="eter-box"><h2>Configurações da conta</h2><div id="eterUserLabel" style="font-size:12px;color:#a9c99e;overflow-wrap:anywhere"></div><div id="eterSettingsOut"><label class="eter-label">E-mail</label><input class="eter-input" id="eterEmail2" type="email"><label class="eter-label">Senha</label><input class="eter-input" id="eterPassword2" type="password"><div class="eter-actions"><button class="eter-btn" id="eterLogin2">ENTRAR</button><button class="eter-btn alt" id="eterRegister2">CRIAR CONTA</button></div></div><div id="eterSettingsIn" hidden><div class="eter-actions"><button class="eter-btn alt" id="eterLogout">SAIR DA CONTA</button></div></div><div id="eterSettingsNotice"></div><div class="eter-actions"><button class="eter-btn alt" id="eterCloseSettings">FECHAR</button></div></section>';
+  document.body.appendChild(e);
+ }
+ if(!$("eterSettingsButton")){
+  const b=document.createElement("button");b.id="eterSettingsButton";b.textContent="⚙ Conta";
+  document.querySelector(".topright")?.appendChild(b);
+ }
+ $("eterLogin").onclick=()=>auth("login","eterEmail","eterPassword","eterAuthNotice");
+ $("eterRegister").onclick=()=>auth("register","eterEmail","eterPassword","eterAuthNotice");
+ $("eterLogin2").onclick=()=>auth("login","eterEmail2","eterPassword2","eterSettingsNotice");
+ $("eterRegister2").onclick=()=>auth("register","eterEmail2","eterPassword2","eterSettingsNotice");
+ $("eterLogout").onclick=async()=>{
+  const r=await db.auth.signOut();
+  if(r.error)return msg("eterSettingsNotice",r.error.message,true);
+  session=null;campaignId=null;lockUI();$("eterSettings").hidden=true;
+ };
+ $("eterSettingsButton").onclick=()=>$("eterSettings").hidden=false;
+ $("eterCloseSettings").onclick=()=>$("eterSettings").hidden=true;
+ $("eterSettings").onclick=e=>{if(e.target.id==="eterSettings")e.currentTarget.hidden=true};
+}
+
+function lockUI(){
+ const yes=!!session?.user;
+ document.body.classList.toggle("eter-locked",!yes);
+ $("eterAuthLayer").hidden=yes;
+ $("eterSettingsOut").hidden=yes;
+ $("eterSettingsIn").hidden=!yes;
+ $("eterUserLabel").textContent=yes?"Conectado: "+session.user.email:"Nenhuma conta conectada";
+ $("eterSettingsButton").textContent=yes?"⚙ Configurações":"⚙ Entrar";
+ if(!yes){
+  $("playerAction")?.setAttribute("disabled","");
+  $("sendAction")?.setAttribute("disabled","");
+ }
+}
+
+async function auth(kind,emailId,passId,nid){
+ const email=$(emailId).value.trim(),password=$(passId).value;
+ if(!email||!password)return msg(nid,"Preencha e-mail e senha.",true);
+ if(kind==="register"&&password.length<6)return msg(nid,"A senha precisa ter pelo menos 6 caracteres.",true);
+ msg(nid,kind==="login"?"Entrando...":"Criando conta...");
+ try{
+  const r=kind==="login"
+   ?await db.auth.signInWithPassword({email,password})
+   :await db.auth.signUp({email,password});
+  if(r.error)throw r.error;
+  if(r.data.session){
+   session=r.data.session;lockUI();$("eterSettings").hidden=true;
+   await listCampaigns();msg(nid,"Login realizado.");
+  }else msg(nid,"Conta criada. Confirme o e-mail se solicitado e depois entre.");
+ }catch(e){msg(nid,e.message,true)}
+}
+
+function addJourneyTab(){
+ const nav=$("nav");
+ if(nav&&!nav.querySelector('[data-tab="solo"]')){
+  const b=document.createElement("button");
+  b.dataset.tab="solo";
+  b.innerHTML='<span class="ico">✧</span>Mestre IA · Jornada';
+  nav.appendChild(b);
+ }
+}
+
+function addTools(){
+ const sel=$("campaignSelect");
+ if(!sel||$("eterSoloTools"))return;
+ const w=document.createElement("div");
+ w.id="eterSoloTools";w.className="solo-tools";
+ w.innerHTML='<button class="btn ghost" id="eterContinue">▶ Continuar jornada</button><button class="btn ghost" id="eterRestart">↻ Reiniciar em nova campanha</button>';
+ sel.insertAdjacentElement("afterend",w);
+ $("eterContinue").onclick=()=>sel.value?loadCampaign(sel.value):msg("turnFeedback","Selecione uma campanha salva.",true);
+ $("eterRestart").onclick=()=>{
+  if($("campaignTitle"))$("campaignTitle").value=($("campaignTitle").value||"Minha jornada")+" — Novo começo";
+  createCampaign();
+ };
+}
+
+function setPlay(on){
+ $("playerAction")?.toggleAttribute("disabled",!on);
+ $("sendAction")?.toggleAttribute("disabled",!on);
+}
+
+async function listCampaigns(){
+ if(!session)return;
+ const sel=$("campaignSelect");
+ const r=await db.from("campaigns").select("id,title,updated_at").eq("user_id",session.user.id).order("updated_at",{ascending:false});
+ if(r.error){msg("turnFeedback","Erro ao buscar campanhas: "+r.error.message,true);return}
+ sel.innerHTML='<option value="">Selecione uma campanha salva</option>';
+ (r.data||[]).forEach(c=>{
+  const o=document.createElement("option");o.value=c.id;o.textContent=c.title;sel.appendChild(o);
+ });
+ if(r.data?.length){sel.value=r.data[0].id;await loadCampaign(r.data[0].id)}
+ else{campaignId=null;setPlay(false)}
+}
+
+function renderTurn(t){
+ const log=$("storyLog");if(!log||!t)return;
+ log.querySelector(".story-empty")?.remove();
+ const a=document.createElement("article");a.className="story-turn";
+ const h=document.createElement("small");h.textContent="CENA "+t.turn_number;
+ const p=document.createElement("div");p.textContent=t.scene_text||"";
+ a.append(h,p);log.appendChild(a);
+ const box=$("suggestedChoices");box.innerHTML="";
+ (t.options||[]).forEach(o=>{
+  const b=document.createElement("button");b.className="btn ghost";
+  b.textContent=(o.key?o.key+" · ":"")+o.text;
+  b.onclick=()=>send({input_mode:"choice",selected_option_key:o.key});
+  box.appendChild(b);
+ });
+ log.scrollTop=log.scrollHeight;
+}
+
+async function loadCampaign(id){
+ if(!session||!id)return;
+ campaignId=id;setPlay(false);
+ msg("turnFeedback","Carregando jornada salva...");
+ const q=await Promise.all([
+  db.from("campaigns").select("*").eq("id",id).eq("user_id",session.user.id).single(),
+  db.from("narrative_turns").select("id,turn_number,scene_text,options,scene_state,image_url").eq("campaign_id",id).eq("user_id",session.user.id).order("turn_number",{ascending:true}),
+  db.from("characters").select("name,class,level,experience,resources").eq("campaign_id",id).eq("user_id",session.user.id).limit(1).maybeSingle()
+ ]);
+ if(q[0].error||q[1].error){msg("turnFeedback",(q[0].error||q[1].error).message,true);return}
+ const c=q[0].data,turns=q[1].data||[],ch=q[2].data;
+ if($("campaignTitle"))$("campaignTitle").value=c.title||"";
+ if($("campaignPremise"))$("campaignPremise").value=c.premise||"";
+ if($("campaignStory"))$("campaignStory").value=c.world_canon||"";
+ if($("campaignRules"))$("campaignRules").value=c.house_rules||"";
+ $("storyLog").innerHTML="";
+ if(turns.length)turns.forEach(renderTurn);
+ else $("storyLog").innerHTML='<div class="story-empty">Campanha criada. Envie sua primeira ação para começar.</div>';
+ setPlay(true);
+ const r=ch?.resources||{};
+ $("soloState").textContent=ch
+  ?("Personagem: "+ch.name+" · "+ch.class+" · Nível "+ch.level+" · XP "+ch.experience+" · HP "+(r.hp??"—")+"/"+(r.hp_max??"—")+" · Mana "+(r.mana??"—")+"/"+(r.mana_max??"—"))
+  :"Personagem não cadastrado";
+ msg("turnFeedback","Jornada carregada: "+c.title+". "+turns.length+" cenas salvas.");
+ $("soloStatus").textContent="● Jornada conectada";
+ $("masterStatus").textContent="MAIAR · Gemini";
+ $("adminStatus").textContent="OTA · Groq";
+}
+
+async function createCampaign(){
+ if(!session){$("eterSettings").hidden=false;return}
+ if(busy)return;
+ busy=true;msg("turnFeedback","Criando campanha e personagem...");
+ try{
+  const title=$("campaignTitle").value.trim()||"Nova campanha";
+  const premise=$("campaignPremise").value.trim()||"Uma aventura de fantasia medieval.";
+  const world=$("campaignWorld").value.trim();
+  const story=$("campaignStory").value.trim();
+  const rules=$("campaignRules").value.trim()||"Testes com D20 + modificador contra dificuldade.";
+  const c=await db.from("campaigns").insert({
+   user_id:session.user.id,title,premise,
+   world_canon:[world,story].filter(Boolean).join("\n\n"),
+   house_rules:rules
+  }).select("id").single();
+  if(c.error)throw c.error;
+  const ch=await db.from("characters").insert({
+   campaign_id:c.data.id,user_id:session.user.id,
+   name:"Aventureiro",class:"Viajante",level:1,experience:0,
+   attributes:{for:10,des:10,con:10,int:10,sab:10,car:10},
+   resources:{hp:30,hp_max:30,mana:20,mana_max:20,stamina:20,stamina_max:20,gold:25,inventory:[]}
+  });
+  if(ch.error)throw ch.error;
+  const se=await db.from("game_sessions").insert({
+   campaign_id:c.data.id,user_id:session.user.id,
+   status:"active",current_region:"Local de partida",
+   world_state:{chapter:1,day:1}
+  });
+  if(se.error)throw se.error;
+  await listCampaigns();
+  $("campaignSelect").value=c.data.id;
+  await loadCampaign(c.data.id);
+  await send({
+   input_mode:"free_text",
+   player_text:"Comece a jornada. Apresente o cenário inicial, meu personagem, uma situação urgente e escolhas para agir."
+  });
+ }catch(e){msg("turnFeedback","Erro ao criar jornada: "+e.message,true)}
+ finally{busy=false}
+}
+
+async function saveRules(){
+ if(!session||!campaignId)return msg("turnFeedback","Selecione uma campanha.",true);
+ const r=await db.from("campaigns").update({
+  title:$("campaignTitle").value.trim(),
+  premise:$("campaignPremise").value.trim(),
+  world_canon:[$("campaignWorld").value.trim(),$("campaignStory").value.trim()].filter(Boolean).join("\n\n"),
+  house_rules:$("campaignRules").value.trim(),
+  updated_at:new Date().toISOString()
+ }).eq("id",campaignId).eq("user_id",session.user.id);
+ msg("turnFeedback",r.error?"Erro ao salvar: "+r.error.message:"Regras e cânone salvos.",!!r.error);
+}
+
+async function send(payload){
+ if(!session||!campaignId||busy)return;
+ busy=true;setPlay(false);
+ msg("turnFeedback","OTA está calculando a ação; MAIAR está narrando...");
+ try{
+  const r=await db.functions.invoke("submit-player-action",{
+   body:Object.assign({campaign_id:campaignId},payload)
+  });
+  if(r.error)throw r.error;
+  if(r.data?.error)throw new Error(r.data.detail||r.data.error);
+  if(r.data.narrative)renderTurn(r.data.narrative);
+  const a=r.data.administrator||{},e=a.effects_applied||{};
+  const result=a.roll==null?"Ação sem teste":
+   "D20 "+a.roll+" "+(a.modifier>=0?"+":"")+a.modifier+
+   " = "+a.total+" / CD "+a.difficulty+" · "+(a.success?"SUCESSO":"FALHA");
+  msg("turnFeedback",result+
+   " · XP "+(e.xp>=0?"+":"")+(e.xp||0)+
+   " · HP "+(e.hp>=0?"+":"")+(e.hp||0)+
+   " · Mana "+(e.mana>=0?"+":"")+(e.mana||0)+
+   " · Ouro "+(e.gold>=0?"+":"")+(e.gold||0));
+  await loadCampaign(campaignId);
+  $("playerAction").value="";
+ }catch(e){msg("turnFeedback","Falha na interação: "+e.message,true)}
+ finally{busy=false;setPlay(!!campaignId)}
+}
+
+function bind(){
+ addJourneyTab();addTools();
+ $("createCampaign")?.addEventListener("click",createCampaign);
+ $("saveCampaignRules")?.addEventListener("click",saveRules);
+ $("sendAction")?.addEventListener("click",()=>{
+  const v=$("playerAction")?.value.trim();
+  if(v)send({input_mode:"free_text",player_text:v});
+  else msg("turnFeedback","Descreva o que deseja fazer.",true);
+ });
+ $("playerAction")?.addEventListener("keydown",e=>{
+  if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();$("sendAction").click()}
+ });
+ $("campaignSelect")?.addEventListener("change",e=>loadCampaign(e.target.value));
+ $("rollD20")?.addEventListener("click",()=>{
+  msg("turnFeedback","Rolagem livre D20: "+(1+Math.floor(Math.random()*20)));
+ });
+}
+
+async function sdk(){
+ if(window.supabase?.createClient)return;
+ await new Promise((ok,no)=>{
+  const s=document.createElement("script");
+  s.src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js";
+  s.onload=ok;s.onerror=()=>no(new Error("Falha ao carregar Supabase SDK"));
+  document.head.appendChild(s);
+ });
+}
+
+async function init(){
+ styles();document.body.classList.add("eter-locked");authUI();
+ try{
+  await sdk();
+  db=window.supabase.createClient(URL,KEY,{
+   auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}
+  });
+  const r=await db.auth.getSession();
+  if(r.error)throw r.error;
+  session=r.data.session;
+  bind();lockUI();
+  db.auth.onAuthStateChange((_e,s)=>{
+   session=s;lockUI();
+   if(s)Promise.resolve().then(listCampaigns);
+  });
+  if(session)await listCampaigns();
+  else msg("eterAuthNotice","Entre para abrir sua jornada.");
+ }catch(e){msg("eterAuthNotice","Erro de conexão: "+e.message,true)}
+}
+
+if(document.readyState==="loading")
+ document.addEventListener("DOMContentLoaded",init,{once:true});
+else init();
 })();
