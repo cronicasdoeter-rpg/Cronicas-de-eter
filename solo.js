@@ -1,4 +1,3 @@
-
 (() => {
 "use strict";
 
@@ -6,6 +5,9 @@ const URL="https://wwumjtorusjblitkzyjt.supabase.co";
 const KEY="sb_publishable_5DS37kwbBFfhOir50K0QyA_54lvldUM";
 
 let db=null,session=null,campaignId=null,busy=false;
+let characterDead=false;
+
+window.eterCharacterDead=false;
 
 const $=id=>document.getElementById(id);
 
@@ -65,6 +67,7 @@ function styles(){
  '#solo .jc-attrs span{background:#ffffff0b;padding:6px;border-radius:6px;text-align:center;font-size:11px}'+
  '#solo .jc-meta{grid-column:1/-1;color:#c5bda9;font-size:11px}'+
  '#solo .composer{gap:8px}'+
+ '#solo .eter-death{padding:16px;margin:12px 0;border:1px solid #a33;border-radius:12px;background:#321719;color:#ffd9d9;font-weight:800;text-align:center}'+
  '@media(max-width:600px){#solo .composer{flex-direction:column}#solo .journey-character{grid-template-columns:1fr 1fr}}';
  document.head.appendChild(s);
 }
@@ -139,6 +142,8 @@ function authUI(){
   if(r.error)return msg("eterSettingsNotice",r.error.message,true);
   session=null;
   campaignId=null;
+  characterDead=false;
+  window.eterCharacterDead=false;
   lockUI();
   $("eterSettings").hidden=true;
  };
@@ -162,10 +167,7 @@ function lockUI(){
  $("eterSettingsButton").textContent=yes
   ?"⚙ Configurações"
   :"⚙ Entrar";
- if(!yes){
-  $("playerAction")?.setAttribute("disabled","");
-  $("sendAction")?.setAttribute("disabled","");
- }
+ if(!yes)setPlay(false);
 }
 
 async function auth(kind,emailId,passId,nid){
@@ -227,8 +229,12 @@ function addTools(){
 }
 
 function setPlay(on){
- $("playerAction")?.toggleAttribute("disabled",!on);
- $("sendAction")?.toggleAttribute("disabled",!on);
+ const allowed=!!on&&!characterDead&&!window.eterCharacterDead;
+ $("playerAction")?.toggleAttribute("disabled",!allowed);
+ $("sendAction")?.toggleAttribute("disabled",!allowed);
+ document.querySelectorAll("#suggestedChoices button").forEach(b=>{
+  b.disabled=!allowed;
+ });
 }
 
 async function listCampaigns(){
@@ -254,6 +260,8 @@ async function listCampaigns(){
   await loadCampaign(r.data[0].id);
  }else{
   campaignId=null;
+  characterDead=false;
+  window.eterCharacterDead=false;
   setPlay(false);
  }
 }
@@ -285,11 +293,11 @@ function renderCharacter(ch){
  '<div class="jc-level">'+esc(ch.class||"Viajante")+' · Nível '+esc(ch.level??1)+'</div>'+
  '</div><div class="jc-level">✨ '+esc(ch.experience??0)+' XP</div></div>'+
  '<div class="jc-stat"><b>❤️ HP '+hp+' / '+hpMax+'</b>'+
- '<div class="jc-bar"><i style="width:'+Math.min(100,hp/hpMax*100)+'%"></i></div></div>'+
+ '<div class="jc-bar"><i style="width:'+Math.max(0,Math.min(100,hp/hpMax*100))+'%"></i></div></div>'+
  '<div class="jc-stat"><b>🔷 Mana '+mana+' / '+manaMax+'</b>'+
- '<div class="jc-bar mana"><i style="width:'+Math.min(100,mana/manaMax*100)+'%"></i></div></div>'+
+ '<div class="jc-bar mana"><i style="width:'+Math.max(0,Math.min(100,mana/manaMax*100))+'%"></i></div></div>'+
  '<div class="jc-stat"><b>⚡ Energia '+stamina+' / '+staminaMax+'</b>'+
- '<div class="jc-bar mana"><i style="width:'+Math.min(100,stamina/staminaMax*100)+'%"></i></div></div>'+
+ '<div class="jc-bar mana"><i style="width:'+Math.max(0,Math.min(100,stamina/staminaMax*100))+'%"></i></div></div>'+
  '<div class="jc-stat"><b>🪙 Ouro</b>'+esc(r.gold??0)+'</div>'+
  '<div class="jc-attrs">'+attrs.map(x=>'<span>'+x[0]+' · '+esc(x[1])+'</span>').join("")+'</div>'+
  '<div class="jc-meta">🛡️ Condição: '+
@@ -298,6 +306,11 @@ function renderCharacter(ch){
  '<br>🎒 Itens: '+
  (Array.isArray(r.inventory)?r.inventory.reduce((n,x)=>n+Number(x.quantity||1),0):0)+
  ' · Abra o inventário para ver os detalhes.</div></section>';
+
+ if(characterDead){
+  host.insertAdjacentHTML("beforeend",
+   '<div class="eter-death">☠️ PERSONAGEM MORTO — MORTE PERMANENTE<br>Esta jornada não pode continuar.</div>');
+ }
 }
 
 /* RENDERIZA A CENA E AS ESCOLHAS */
@@ -357,6 +370,7 @@ function renderTurn(t,playerAction){
    const b=document.createElement("button");
    b.className="btn ghost";
    b.textContent=key+" · "+choiceText;
+   b.disabled=characterDead;
    b.onclick=()=>send({
     input_mode:"choice",
     selected_option_key:key,
@@ -368,7 +382,7 @@ function renderTurn(t,playerAction){
  log.scrollTop=log.scrollHeight;
 }
 
-/* CARREGA CAMPANHA E EVITA DUPLICAR A CENA RECÉM-RECEBIDA */
+/* CARREGA CAMPANHA E VERIFICA MORTE PERMANENTE */
 async function loadCampaign(id,optimisticTurn=null,optimisticAction=''){
  if(!session||!id)return;
  campaignId=id;
@@ -399,6 +413,14 @@ async function loadCampaign(id,optimisticTurn=null,optimisticAction=''){
   turns.push(optimisticTurn);
  const ch=q[2].data;
 
+ const hp=Number(ch?.resources?.hp??0);
+ characterDead=!!(
+  ch?.resources?.dead===true||
+  ch?.resources?.permanent_death===true||
+  (ch&&hp<=0)
+ );
+ window.eterCharacterDead=characterDead;
+
  if($("campaignTitle"))$("campaignTitle").value=c.title||"";
  if($("campaignPremise"))$("campaignPremise").value=c.premise||"";
  if($("campaignStory"))$("campaignStory").value=c.world_canon||"";
@@ -418,8 +440,15 @@ async function loadCampaign(id,optimisticTurn=null,optimisticAction=''){
 
  renderCharacter(ch);
  setPlay(true);
- msg("turnFeedback","Jornada carregada: "+c.title+". "+turns.length+" cenas salvas.");
- $("soloStatus").textContent="● Jornada conectada";
+
+ if(characterDead){
+  msg("turnFeedback","☠️ MORTE PERMANENTE: este personagem morreu. As ações desta jornada estão bloqueadas.",true);
+  $("soloStatus").textContent="☠️ Personagem morto";
+ }else{
+  msg("turnFeedback","Jornada carregada: "+c.title+". "+turns.length+" cenas salvas.");
+  $("soloStatus").textContent="● Jornada conectada";
+ }
+
  $("masterStatus").textContent="MAIAR · Groq principal / Gemini reserva";
  $("adminStatus").textContent="OTA · Groq";
 }
@@ -474,6 +503,8 @@ async function createCampaign(){
   sel.appendChild(option);
   sel.value=c.data.id;
   campaignId=c.data.id;
+  characterDead=false;
+  window.eterCharacterDead=false;
 
   await loadCampaign(c.data.id);
   busy=false;
@@ -509,9 +540,14 @@ async function saveRules(){
  );
 }
 
-/* ENVIA AÇÃO, MOSTRA TEXTO EM STREAMING E SINCRONIZA */
+/* ENVIA AÇÃO E SINCRONIZA A RESPOSTA */
 async function send(payload){
  if(!session||!campaignId||busy)return;
+ if(characterDead||window.eterCharacterDead){
+  msg("turnFeedback","☠️ Este personagem morreu permanentemente. Não é possível realizar novas ações.",true);
+  setPlay(false);
+  return;
+ }
  busy=true;
  setPlay(false);
 
@@ -701,6 +737,9 @@ async function init(){
     detectSessionInUrl:true
    }
   });
+
+  window.eterSupabaseClient=db;
+  window.dispatchEvent(new CustomEvent("eter:supabase-ready"));
 
   const r=await db.auth.getSession();
   if(r.error)throw r.error;
