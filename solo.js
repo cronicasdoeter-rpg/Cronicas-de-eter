@@ -1,3 +1,4 @@
+
 (() => {
 "use strict";
 
@@ -25,7 +26,6 @@ const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({
 }[c]));
 
 function styles(){
-
  if($("eterSoloStyles"))return;
 
  const s=document.createElement("style");
@@ -79,7 +79,6 @@ function styles(){
 function authUI(){
 
  if(!$("eterAuthLayer")){
-
   const e=document.createElement("div");
   e.id="eterAuthLayer";
 
@@ -103,7 +102,6 @@ function authUI(){
  }
 
  if(!$("eterSettings")){
-
   const e=document.createElement("div");
   e.id="eterSettings";
   e.hidden=true;
@@ -137,11 +135,9 @@ function authUI(){
  }
 
  if(!$("eterSettingsButton")){
-
   const b=document.createElement("button");
   b.id="eterSettingsButton";
   b.textContent="⚙ Conta";
-
   document.querySelector(".topright")?.appendChild(b);
  }
 
@@ -152,14 +148,10 @@ function authUI(){
  $("eterRegister2").onclick=()=>auth("register","eterEmail2","eterPassword2","eterSettingsNotice");
 
  $("eterLogout").onclick=async()=>{
-
   const r=await db.auth.signOut();
-
   if(r.error)return msg("eterSettingsNotice",r.error.message,true);
-
   session=null;
   campaignId=null;
-
   lockUI();
   $("eterSettings").hidden=true;
  };
@@ -173,7 +165,6 @@ function authUI(){
 }
 
 function lockUI(){
-
  const yes=!!session?.user;
 
  document.body.classList.toggle("eter-locked",!yes);
@@ -197,7 +188,6 @@ function lockUI(){
 }
 
 async function auth(kind,emailId,passId,nid){
-
  const email=$(emailId).value.trim();
  const password=$(passId).value;
 
@@ -210,7 +200,6 @@ async function auth(kind,emailId,passId,nid){
  msg(nid,kind==="login"?"Entrando...":"Criando conta...");
 
  try{
-
   const r=kind==="login"
    ?await db.auth.signInWithPassword({email,password})
    :await db.auth.signUp({email,password});
@@ -218,53 +207,35 @@ async function auth(kind,emailId,passId,nid){
   if(r.error)throw r.error;
 
   if(r.data.session){
-
    session=r.data.session;
-
    lockUI();
-
    $("eterSettings").hidden=true;
-
    await listCampaigns();
-
    msg(nid,"Login realizado.");
-
   }else{
-
    msg(nid,"Conta criada. Confirme o e-mail se solicitado e depois entre.");
-
   }
-
  }catch(e){
-
   msg(nid,e.message,true);
-
  }
 }
 
 function addJourneyTab(){
-
  const nav=$("nav");
 
  if(nav&&!nav.querySelector('[data-tab="solo"]')){
-
   const b=document.createElement("button");
-
   b.dataset.tab="solo";
   b.innerHTML='<span class="ico">✧</span>Mestre IA · Jornada';
-
   nav.appendChild(b);
  }
 }
 
 function addTools(){
-
  const sel=$("campaignSelect");
-
  if(!sel||$("eterSoloTools"))return;
 
  const w=document.createElement("div");
-
  w.id="eterSoloTools";
  w.className="solo-tools";
 
@@ -281,22 +252,18 @@ function addTools(){
  };
 
  $("eterRestart").onclick=()=>{
-
   if($("campaignTitle"))
    $("campaignTitle").value=($("campaignTitle").value||"Minha jornada")+" — Novo começo";
-
   createCampaign();
  };
 }
 
 function setPlay(on){
-
  $("playerAction")?.toggleAttribute("disabled",!on);
  $("sendAction")?.toggleAttribute("disabled",!on);
 }
 
 async function listCampaigns(){
-
  if(!session)return;
 
  const sel=$("campaignSelect");
@@ -314,40 +281,28 @@ async function listCampaigns(){
  sel.innerHTML='<option value="">Selecione uma campanha salva</option>';
 
  (r.data||[]).forEach(c=>{
-
   const o=document.createElement("option");
-
   o.value=c.id;
   o.textContent=c.title;
-
   sel.appendChild(o);
  });
 
  if(r.data?.length){
-
   sel.value=r.data[0].id;
-
   await loadCampaign(r.data[0].id);
-
  }else{
-
   campaignId=null;
   setPlay(false);
-
  }
 }
 
 function renderCharacter(ch){
-
  const host=$("soloState");
-
  if(!host)return;
 
  if(!ch){
-
   host.textContent="Personagem não cadastrado";
   return;
-
  }
 
  const r=ch.resources||{};
@@ -373,7 +328,6 @@ function renderCharacter(ch){
 
  host.innerHTML=
  '<section class="journey-character">'+
-
  '<div class="jc-head">'+
   '<div>'+
    '<div class="jc-name">🧙 '+esc(ch.name||"Aventureiro")+'</div>'+
@@ -381,31 +335,25 @@ function renderCharacter(ch){
   '</div>'+
   '<div class="jc-level">✨ '+esc(ch.experience??0)+' XP</div>'+
  '</div>'+
-
  '<div class="jc-stat">'+
   '<b>❤️ HP '+hp+' / '+hpMax+'</b>'+
   '<div class="jc-bar"><i style="width:'+Math.min(100,hp/hpMax*100)+'%"></i></div>'+
  '</div>'+
-
  '<div class="jc-stat">'+
   '<b>🔷 Mana '+mana+' / '+manaMax+'</b>'+
   '<div class="jc-bar mana"><i style="width:'+Math.min(100,mana/manaMax*100)+'%"></i></div>'+
  '</div>'+
-
  '<div class="jc-stat">'+
   '<b>⚡ Energia '+stamina+' / '+staminaMax+'</b>'+
   '<div class="jc-bar mana"><i style="width:'+Math.min(100,stamina/staminaMax*100)+'%"></i></div>'+
  '</div>'+
-
  '<div class="jc-stat">'+
   '<b>🪙 Ouro</b>'+
   esc(r.gold??0)+
  '</div>'+
-
  '<div class="jc-attrs">'+
   attrs.map(x=>'<span>'+x[0]+' · '+esc(x[1])+'</span>').join("")+
  '</div>'+
-
  '<div class="jc-meta">'+
   '🛡️ Condição: '+
   esc(Array.isArray(r.status_effects)&&r.status_effects.length
@@ -417,97 +365,69 @@ function renderCharacter(ch){
    :0)+
   ' · Abra o inventário para ver os detalhes.'+
  '</div>'+
-
  '</section>';
 }
 
 function renderTurn(t,playerAction){
-
  const log=$("storyLog");
-
  if(!log||!t)return;
 
  log.querySelector(".story-empty")?.remove();
 
  const a=document.createElement("article");
-
  a.className="story-turn";
 
  const h=document.createElement("small");
-
  h.textContent="📜 CENA "+(t.turn_number??"");
-
  a.appendChild(h);
 
  if(playerAction){
-
   const p=document.createElement("div");
-
   p.className="story-player";
   p.textContent="🧑 Você: "+playerAction;
-
   a.appendChild(p);
  }
 
  const body=document.createElement("div");
-
  const raw=String(t.scene_text||"");
 
  raw.split(/\n+/).filter(Boolean).forEach(line=>{
-
   const m=line.match(/^\s*([A-ZÀ-Ú][^:\n]{1,35}):\s*(.+)$/u);
-
   const d=document.createElement("div");
 
   if(m){
-
    d.className="story-dialogue";
-
    const who=document.createElement("strong");
    who.textContent="💬 "+m[1];
-
    const speech=document.createElement("div");
    speech.textContent=m[2];
-
    d.append(who,speech);
-
   }else if(/^\s*[—–]/.test(line)){
-
    d.className="story-dialogue";
    d.textContent="💬 "+line.replace(/^\s*[—–]\s*/,"");
-
   }else{
-
    d.className="story-narrator";
    d.textContent="📖 "+line;
-
   }
 
   body.appendChild(d);
  });
 
  a.appendChild(body);
-
  log.appendChild(a);
 
  const box=$("suggestedChoices");
 
  if(box){
-
   box.innerHTML="";
-
   (t.options||[]).forEach(o=>{
-
    const b=document.createElement("button");
-
    b.className="btn ghost";
    b.textContent=(o.key?o.key+" · ":"")+o.text;
-
    b.onclick=()=>send({
     input_mode:"choice",
     selected_option_key:o.key
    });
-
    box.appendChild(b);
   });
  }
@@ -516,7 +436,6 @@ function renderTurn(t,playerAction){
 }
 
 async function loadCampaign(id){
-
  if(!session||!id)return;
 
  campaignId=id;
@@ -525,7 +444,6 @@ async function loadCampaign(id){
  msg("turnFeedback","Carregando jornada salva...");
 
  const q=await Promise.all([
-
   db.from("campaigns")
    .select("*")
    .eq("id",id)
@@ -544,12 +462,11 @@ async function loadCampaign(id){
    .eq("user_id",session.user.id)
    .limit(1)
    .maybeSingle()
-
  ]);
 
- if(q[0].error||q[1].error){
-
-  msg("turnFeedback",(q[0].error||q[1].error).message,true);
+ // CORREÇÃO: também verifica erros na consulta do personagem.
+ if(q[0].error||q[1].error||q[2].error){
+  msg("turnFeedback",(q[0].error||q[1].error||q[2].error).message,true);
   return;
  }
 
@@ -572,14 +489,10 @@ async function loadCampaign(id){
  $("storyLog").innerHTML="";
 
  if(turns.length){
-
   turns.forEach(t=>renderTurn(t));
-
  }else{
-
   $("storyLog").innerHTML=
    '<div class="story-empty">Campanha criada. Envie sua primeira ação para começar.</div>';
-
  }
 
  renderCharacter(ch);
@@ -594,7 +507,6 @@ async function loadCampaign(id){
 }
 
 async function createCampaign(){
-
  if(!session){
   $("eterSettings").hidden=false;
   return;
@@ -603,15 +515,13 @@ async function createCampaign(){
  if(busy)return;
 
  busy=true;
+ setPlay(false);
 
  msg("turnFeedback","Criando campanha e personagem...");
 
  try{
-
   const title=$("campaignTitle").value.trim()||"Nova campanha";
-
   const premise=$("campaignPremise").value.trim()||"Uma aventura de fantasia medieval.";
-
   const world=$("campaignWorld").value.trim();
   const story=$("campaignStory").value.trim();
 
@@ -619,26 +529,22 @@ async function createCampaign(){
    "Testes com D20 + modificador contra dificuldade.";
 
   const c=await db.from("campaigns").insert({
-
    user_id:session.user.id,
    title,
    premise,
    world_canon:[world,story].filter(Boolean).join("\n\n"),
    house_rules:rules
-
   }).select("id").single();
 
   if(c.error)throw c.error;
 
   const ch=await db.from("characters").insert({
-
    campaign_id:c.data.id,
    user_id:session.user.id,
    name:"Aventureiro",
    class:"Viajante",
    level:1,
    experience:0,
-
    attributes:{
     for:10,
     des:10,
@@ -647,7 +553,6 @@ async function createCampaign(){
     sab:10,
     car:10
    },
-
    resources:{
     hp:30,
     hp_max:30,
@@ -658,68 +563,63 @@ async function createCampaign(){
     gold:25,
     inventory:[]
    }
-
   });
 
   if(ch.error)throw ch.error;
 
   const se=await db.from("game_sessions").insert({
-
    campaign_id:c.data.id,
    user_id:session.user.id,
    status:"active",
    current_region:"Local de partida",
    world_state:{chapter:1,day:1}
-
   });
 
   if(se.error)throw se.error;
 
-  await listCampaigns();
+  // Atualiza a lista sem deixar uma chamada concorrente bloquear a primeira ação.
+  const sel=$("campaignSelect");
+  const option=document.createElement("option");
+  option.value=c.data.id;
+  option.textContent=title;
+  sel.appendChild(option);
+  sel.value=c.data.id;
 
-  $("campaignSelect").value=c.data.id;
+  campaignId=c.data.id;
 
+  // Carrega os dados antes de liberar o envio.
   await loadCampaign(c.data.id);
 
+  // CORREÇÃO PRINCIPAL: libera busy antes de chamar send().
+  busy=false;
+
   await send({
-
    input_mode:"free_text",
-
    player_text:
     "Comece a jornada. Apresente o cenário inicial, meu personagem, uma situação urgente e escolhas para agir."
-
   });
 
  }catch(e){
-
   msg("turnFeedback","Erro ao criar jornada: "+e.message,true);
-
  }finally{
-
   busy=false;
-
+  setPlay(!!campaignId);
  }
 }
 
 async function saveRules(){
-
  if(!session||!campaignId)
   return msg("turnFeedback","Selecione uma campanha.",true);
 
  const r=await db.from("campaigns").update({
-
   title:$("campaignTitle").value.trim(),
   premise:$("campaignPremise").value.trim(),
-
   world_canon:[
    $("campaignWorld").value.trim(),
    $("campaignStory").value.trim()
   ].filter(Boolean).join("\n\n"),
-
   house_rules:$("campaignRules").value.trim(),
-
   updated_at:new Date().toISOString()
-
  }).eq("id",campaignId).eq("user_id",session.user.id);
 
  msg(
@@ -730,15 +630,12 @@ async function saveRules(){
 }
 
 async function send(payload){
-
  if(!session||!campaignId||busy)return;
 
  busy=true;
-
  setPlay(false);
 
  const log=$("storyLog");
-
  let live=null;
  let liveText="";
  let completed=null;
@@ -749,7 +646,6 @@ async function send(payload){
  );
 
  try{
-
   const {data:authData,error:authError}=await db.auth.getSession();
 
   if(authError)throw authError;
@@ -763,13 +659,11 @@ async function send(payload){
    URL+"/functions/v1/submit-player-action",
    {
     method:"POST",
-
     headers:{
      "Content-Type":"application/json",
      "apikey":KEY,
      "Authorization":"Bearer "+token
     },
-
     body:JSON.stringify(
      Object.assign({campaign_id:campaignId},payload)
     )
@@ -777,12 +671,8 @@ async function send(payload){
   );
 
   if(!response.ok){
-
    const detail=await response.text();
-
-   throw new Error(
-    "HTTP "+response.status+" "+detail.slice(0,350)
-   );
+   throw new Error("HTTP "+response.status+" "+detail.slice(0,350));
   }
 
   if(!response.body)
@@ -790,44 +680,35 @@ async function send(payload){
 
   const reader=response.body.getReader();
   const decoder=new TextDecoder();
-
   let buffer="";
 
   const showLive=()=>{
-
    if(!live){
-
     live=document.createElement("article");
     live.className="story-turn story-live";
 
     const label=document.createElement("div");
     label.className="story-live-label";
     label.textContent="📖 MAIAR · narrando agora";
-
     live.appendChild(label);
 
     const content=document.createElement("div");
     content.className="story-narrator";
     content.id="eterLiveText";
-
     live.appendChild(content);
 
     log.querySelector(".story-empty")?.remove();
-
     log.appendChild(live);
    }
 
    $("eterLiveText").textContent=liveText;
-
    log.scrollTop=log.scrollHeight;
   };
 
   const process=line=>{
-
    if(!line.trim())return;
 
    let ev;
-
    try{
     ev=JSON.parse(line);
    }catch{
@@ -835,39 +716,28 @@ async function send(payload){
    }
 
    if(ev.type==="stage"){
-
     msg("turnFeedback",ev.message||"Processando...");
-
-    if(ev.stage==="narrative")
+    if(ev.stage==="narrative"||ev.stage==="fallback")
      showLive();
 
    }else if(ev.type==="text"){
-
     liveText+=ev.text||"";
-
     showLive();
 
    }else if(ev.type==="complete"){
-
     completed=ev.data;
 
    }else if(ev.type==="error"){
-
     throw new Error(ev.error||"Falha no processamento");
-
    }
   };
 
   while(true){
-
    const part=await reader.read();
-
    if(part.done)break;
 
    buffer+=decoder.decode(part.value,{stream:true});
-
    const lines=buffer.split(/\r?\n/);
-
    buffer=lines.pop()||"";
 
    for(const line of lines)
@@ -880,7 +750,6 @@ async function send(payload){
    process(buffer);
 
   if(!completed){
-
    throw new Error(
     "A transmissão terminou sem evento final. "+
     (liveText
@@ -909,62 +778,57 @@ async function send(payload){
    " · Ouro "+(e.gold>=0?"+":"")+(e.gold||0)
   );
 
+  // Atualiza o histórico e os dados do personagem.
   await loadCampaign(campaignId);
+
+  // Mostra qual provedor foi usado, quando informado pelo backend.
+  const narrator=completed.providers?.narrator;
+  if(narrator&&$("masterStatus")){
+   $("masterStatus").textContent=
+    "MAIAR · "+
+    (narrator.provider==="groq_fallback"?"Groq (reserva)":narrator.provider)+
+    " · "+(narrator.model||"");
+  }
 
   if($("playerAction"))
    $("playerAction").value="";
 
  }catch(e){
-
   msg("turnFeedback","Falha na interação: "+e.message,true);
 
   if(live)
    live.classList.remove("story-live");
 
  }finally{
-
   busy=false;
-
   setPlay(!!campaignId);
-
  }
 }
 
 function bind(){
-
  addJourneyTab();
  addTools();
 
  $("createCampaign")?.addEventListener("click",createCampaign);
-
  $("saveCampaignRules")?.addEventListener("click",saveRules);
 
  $("sendAction")?.addEventListener("click",()=>{
-
   const v=$("playerAction")?.value.trim();
 
   if(v){
-
    send({
     input_mode:"free_text",
     player_text:v
    });
-
   }else{
-
    msg("turnFeedback","Descreva o que deseja fazer.",true);
-
   }
  });
 
  $("playerAction")?.addEventListener("keydown",e=>{
-
   if(e.key==="Enter"&&!e.shiftKey){
-
    e.preventDefault();
-
    $("sendAction").click();
-
   }
  });
 
@@ -973,44 +837,31 @@ function bind(){
  );
 
  $("rollD20")?.addEventListener("click",()=>{
-
   msg(
    "turnFeedback",
    "🎲 Rolagem livre D20: "+(1+Math.floor(Math.random()*20))
   );
-
  });
 }
 
 async function sdk(){
-
  if(window.supabase?.createClient)return;
 
  await new Promise((ok,no)=>{
-
   const s=document.createElement("script");
-
   s.src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js";
-
   s.onload=ok;
-
   s.onerror=()=>no(new Error("Falha ao carregar Supabase SDK"));
-
   document.head.appendChild(s);
-
  });
 }
 
 async function init(){
-
  styles();
-
  document.body.classList.add("eter-locked");
-
  authUI();
 
  try{
-
   await sdk();
 
   db=window.supabase.createClient(
@@ -1026,24 +877,19 @@ async function init(){
   );
 
   const r=await db.auth.getSession();
-
   if(r.error)throw r.error;
 
   session=r.data.session;
 
   bind();
-
   lockUI();
 
   db.auth.onAuthStateChange((_e,s)=>{
-
    session=s;
-
    lockUI();
 
    if(s)
     Promise.resolve().then(listCampaigns);
-
   });
 
   if(session)
@@ -1052,20 +898,14 @@ async function init(){
    msg("eterAuthNotice","Entre para abrir sua jornada.");
 
  }catch(e){
-
   msg("eterAuthNotice","Erro de conexão: "+e.message,true);
-
  }
 }
 
 if(document.readyState==="loading"){
-
  document.addEventListener("DOMContentLoaded",init,{once:true});
-
 }else{
-
  init();
-
 }
 
 })();
