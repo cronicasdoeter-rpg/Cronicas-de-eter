@@ -5,83 +5,138 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#09090d">
-
-  <title>Crônicas de Éter — RPG</title>
-
-  <meta
-    name="description"
-    content="Crônicas de Éter — Sua aventura começa aqui."
-  >
-
-  <!-- Redirecionamento caso o JavaScript esteja desativado -->
-  <meta
-    http-equiv="refresh"
-    content="0; url=https://wwumjtorusjblitkzyjt.supabase.co/functions/v1/eter-web"
-  >
+  <meta name="description" content="Crônicas de Éter — RPG Solo">
+  <title>Crônicas de Éter — RPG Solo</title>
 
   <style>
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
 
-    html,
-    body {
-      width: 100%;
-      min-height: 100%;
+    html, body {
       margin: 0;
+      min-height: 100%;
       background: #09090d;
       color: #eee;
       font-family: Arial, sans-serif;
     }
 
     body {
-      display: flex;
-      align-items: center;
-      justify-content: center;
       min-height: 100vh;
-      text-align: center;
+      display: grid;
+      place-items: center;
     }
 
-    main {
-      padding: 24px;
+    #status {
+      width: min(90%, 520px);
+      padding: 32px;
+      text-align: center;
+      border: 1px solid #51432d;
+      border-radius: 14px;
+      background: #121117;
     }
 
     h1 {
-      font-size: 24px;
+      color: #d8b36a;
       letter-spacing: 2px;
+      font-size: 22px;
     }
 
     p {
       color: #aaa;
+      line-height: 1.6;
     }
 
-    a {
-      color: #d8b36a;
+    #error {
+      color: #ff8c8c;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
     }
   </style>
 </head>
 
 <body>
-  <main>
+  <main id="status">
     <h1>CRÔNICAS DE ÉTER</h1>
-    <p>Entrando no mundo...</p>
-    <p>
-      Se a página não abrir automaticamente,
-      <a href="https://wwumjtorusjblitkzyjt.supabase.co/functions/v1/eter-web">
-        clique aqui
-      </a>.
-    </p>
+    <p id="message">Conectando ao mundo de Éter...</p>
+    <p id="error"></p>
   </main>
 
   <script>
-    (function () {
-      const destino =
-        "https://wwumjtorusjblitkzyjt.supabase.co/functions/v1/eter-web";
+  (async function iniciarCronicas() {
+    "use strict";
 
-      if (window.location.href !== destino) {
-        window.location.replace(destino);
+    const APP_ENDPOINT =
+      "https://wwumjtorusjblitkzyjt.supabase.co/functions/v1/eter-web";
+
+    const message = document.getElementById("message");
+    const errorBox = document.getElementById("error");
+
+    function mostrarErro(erro) {
+      message.textContent = "Não foi possível carregar o aplicativo.";
+      errorBox.textContent =
+        String(erro && erro.message ? erro.message : erro);
+    }
+
+    try {
+      message.textContent = "Carregando a aplicação do Supabase...";
+
+      const resposta = await fetch(APP_ENDPOINT, {
+        method: "GET",
+        redirect: "follow",
+        cache: "no-store"
+      });
+
+      if (!resposta.ok) {
+        throw new Error(
+          "Supabase respondeu HTTP " + resposta.status
+        );
       }
-    })();
+
+      let html = await resposta.text();
+
+      if (
+        !html ||
+        !html.toLowerCase().includes("<html") ||
+        !html.toLowerCase().includes("</body>")
+      ) {
+        throw new Error(
+          "A resposta recebida não contém uma página HTML válida."
+        );
+      }
+
+      /*
+       * Os arquivos do aplicativo ficam na mesma pasta
+       * da página estática publicada no Supabase Storage.
+       * Usamos a URL final após o redirecionamento para
+       * carregar CSS e JavaScript diretamente dessa origem.
+       */
+      const baseAssets = new URL(".", resposta.url).href;
+
+      html = html.replace(
+        /((?:src|href)=["'])assets\//gi,
+        "$1" + baseAssets + "assets/"
+      );
+
+      /*
+       * Corrige também eventuais referências antigas
+       * ao CSS servido pela função.
+       */
+      html = html.replace(
+        /href=["']\/functions\/v1\/eter-web\/assets\/app\.css[^"']*["']/gi,
+        'href="' + baseAssets + 'assets/app.css"'
+      );
+
+      /*
+       * Entrega o documento completo ao navegador.
+       * A URL pública continua sendo a do GitHub Pages.
+       */
+      document.open();
+      document.write(html);
+      document.close();
+
+    } catch (erro) {
+      mostrarErro(erro);
+    }
+  })();
   </script>
 </body>
 </html>
