@@ -2,35 +2,168 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#0b0c11">
-    <meta name="description" content="Crônicas de Éter — RPG medieval de fantasia">
-    <title>Crônicas de Éter</title>
-    <style>
-        * { box-sizing: border-box; }
-        html, body {
-            margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-            background: #0b0c11;
-        }
-        iframe {
-            display: block;
-            width: 100%;
-            height: 100%;
-            border: 0;
-            background: #0b0c11;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0b0c11">
+  <meta name="description" content="Crônicas de Éter — RPG medieval de fantasia">
+  <title>Crônicas de Éter</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #0b0c11;
+      color: #e9e5dc;
+      font-family: Arial, sans-serif;
+    }
+
+    #app {
+      display: block;
+      width: 100%;
+      height: 100%;
+      border: 0;
+      background: #0b0c11;
+    }
+
+    #loading {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 14px;
+      background: #0b0c11;
+      color: #d5ad68;
+      z-index: 10;
+      text-align: center;
+      padding: 24px;
+    }
+
+    #loading.error {
+      color: #ff9b9b;
+    }
+
+    #loading small {
+      color: #aab0bd;
+      max-width: 500px;
+      line-height: 1.6;
+    }
+
+    .spinner {
+      width: 35px;
+      height: 35px;
+      border: 3px solid #34313a;
+      border-top-color: #d5ad68;
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
 </head>
+
 <body>
-    <iframe
-        src="https://wwumjtorusjblitkzyjt.supabase.co/functions/v1/eter-prototipo"
-        title="Crônicas de Éter"
-        allow="fullscreen"
-    ></iframe>
+
+  <div id="loading">
+    <div class="spinner"></div>
+    <strong>CARREGANDO CRÔNICAS DE ÉTER</strong>
+    <small>Conectando ao servidor oficial...</small>
+  </div>
+
+  <iframe
+    id="app"
+    title="Crônicas de Éter"
+    allow="fullscreen; clipboard-read; clipboard-write"
+    referrerpolicy="strict-origin-when-cross-origin">
+  </iframe>
+
+  <script>
+    (() => {
+      "use strict";
+
+      const APP_URL =
+        "https://wwumjtorusjblitkzyjt.supabase.co/storage/v1/object/public/eter-site/legado.html";
+
+      const BASE_URL =
+        "https://wwumjtorusjblitkzyjt.supabase.co/storage/v1/object/public/eter-site/";
+
+      const frame = document.getElementById("app");
+      const loading = document.getElementById("loading");
+
+      function showError(message) {
+        loading.classList.add("error");
+        loading.innerHTML = `
+          <strong>Não foi possível carregar o site</strong>
+          <small>${message}</small>
+          <small>Verifique sua conexão e tente novamente.</small>
+          <button onclick="location.reload()"
+            style="padding:12px 22px;border:1px solid #d5ad68;
+            background:#282116;color:#f0d39a;border-radius:7px;
+            cursor:pointer;margin-top:12px">
+            TENTAR NOVAMENTE
+          </button>
+        `;
+      }
+
+      async function start() {
+        try {
+          const response = await fetch(APP_URL, {
+            method: "GET",
+            mode: "cors",
+            cache: "no-store"
+          });
+
+          if (!response.ok) {
+            throw new Error("Servidor respondeu HTTP " + response.status);
+          }
+
+          let html = await response.text();
+
+          if (!/<html[\s>]/i.test(html) ||
+              !/<body[\s>]/i.test(html)) {
+            throw new Error("O servidor não entregou o documento HTML esperado.");
+          }
+
+          // Faz os arquivos JS, CSS e imagens relativos
+          // serem carregados diretamente do Supabase.
+          const baseTag = `<base href="${BASE_URL}">`;
+
+          if (/<head[\s>]/i.test(html)) {
+            html = html.replace(
+              /<head([^>]*)>/i,
+              match => match + "\n" + baseTag
+            );
+          } else {
+            throw new Error("O documento principal não possui cabeçalho HTML.");
+          }
+
+          // Renderiza o documento como HTML, mesmo que o
+          // servidor tenha enviado o arquivo como text/plain.
+          frame.srcdoc = html;
+
+          frame.onload = () => {
+            loading.style.display = "none";
+          };
+
+        } catch (error) {
+          console.error("Erro ao carregar Crônicas de Éter:", error);
+          showError(error.message || "Falha de conexão com o Supabase.");
+        }
+      }
+
+      start();
+    })();
+  </script>
+
 </body>
 </html>
