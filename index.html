@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -9,7 +8,9 @@
   <title>Crônicas de Éter — RPG Solo</title>
 
   <style>
-    * { box-sizing: border-box; }
+    * {
+      box-sizing: border-box;
+    }
 
     html, body {
       margin: 0;
@@ -64,20 +65,37 @@
   (async function iniciarCronicas() {
     "use strict";
 
+    /*
+     * GITHUB PAGES:
+     * Hospeda este index.html e mantém o endereço público do site.
+     *
+     * SUPABASE:
+     * Fornece o HTML principal, os módulos, CSS,
+     * banco de dados, autenticação e funções.
+     *
+     * NÃO UTILIZA SUPABASE STORAGE.
+     */
+
     const APP_ENDPOINT =
       "https://wwumjtorusjblitkzyjt.supabase.co/functions/v1/eter-web";
+
+    const ASSET_BASE =
+      APP_ENDPOINT.replace(/\/+$/, "") + "/assets/";
 
     const message = document.getElementById("message");
     const errorBox = document.getElementById("error");
 
     function mostrarErro(erro) {
-      message.textContent = "Não foi possível carregar o aplicativo.";
+      message.textContent =
+        "Não foi possível carregar o aplicativo.";
+
       errorBox.textContent =
         String(erro && erro.message ? erro.message : erro);
     }
 
     try {
-      message.textContent = "Carregando a aplicação do Supabase...";
+      message.textContent =
+        "Conectando ao servidor de Crônicas de Éter...";
 
       const resposta = await fetch(APP_ENDPOINT, {
         method: "GET",
@@ -87,7 +105,7 @@
 
       if (!resposta.ok) {
         throw new Error(
-          "Supabase respondeu HTTP " + resposta.status
+          "Erro no Supabase: HTTP " + resposta.status
         );
       }
 
@@ -99,42 +117,54 @@
         !html.toLowerCase().includes("</body>")
       ) {
         throw new Error(
-          "A resposta recebida não contém uma página HTML válida."
+          "O servidor não retornou um documento HTML válido."
         );
       }
 
       /*
-       * Os arquivos do aplicativo ficam na mesma pasta
-       * da página estática publicada no Supabase Storage.
-       * Usamos a URL final após o redirecionamento para
-       * carregar CSS e JavaScript diretamente dessa origem.
+       * CORREÇÃO PRINCIPAL:
+       *
+       * Os caminhos dos arquivos não podem ser resolvidos
+       * pelo endereço do GitHub Pages.
+       *
+       * Todos os arquivos do aplicativo devem ser buscados
+       * diretamente na rota de assets da função eter-web.
        */
-      const baseAssets = new URL(".", resposta.url).href;
 
+      // Corrige caminhos absolutos da função.
       html = html.replace(
-        /((?:src|href)=["'])assets\//gi,
-        "$1" + baseAssets + "assets/"
+        /((?:src|href)\s*=\s*["'])\/functions\/v1\/eter-web\/assets\//gi,
+        "$1" + ASSET_BASE
+      );
+
+      // Corrige caminhos absolutos /assets/.
+      html = html.replace(
+        /((?:src|href)\s*=\s*["'])\/assets\//gi,
+        "$1" + ASSET_BASE
+      );
+
+      // Corrige caminhos relativos assets/.
+      html = html.replace(
+        /((?:src|href)\s*=\s*["'])assets\//gi,
+        "$1" + ASSET_BASE
       );
 
       /*
-       * Corrige também eventuais referências antigas
-       * ao CSS servido pela função.
+       * O navegador continua na URL do GitHub Pages.
+       * Somente o conteúdo e os recursos são carregados
+       * do backend Supabase.
        */
-      html = html.replace(
-        /href=["']\/functions\/v1\/eter-web\/assets\/app\.css[^"']*["']/gi,
-        'href="' + baseAssets + 'assets/app.css"'
-      );
 
-      /*
-       * Entrega o documento completo ao navegador.
-       * A URL pública continua sendo a do GitHub Pages.
-       */
       document.open();
       document.write(html);
       document.close();
 
     } catch (erro) {
       mostrarErro(erro);
+      console.error(
+        "Erro ao iniciar Crônicas de Éter:",
+        erro
+      );
     }
   })();
   </script>
